@@ -55,7 +55,7 @@ def _get_openai_client():
         from openai import OpenAI
         return OpenAI(api_key=settings.OPENAI_API_KEY)
     except Exception as exc:
-        logger.error("Failed to initialise OpenAI client: %s", exc)
+        logger.error("Failed to initialize OpenAI client: %s", exc)
         return None
 
 

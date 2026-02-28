@@ -24,7 +24,7 @@ def _get_twilio_client():
         from twilio.rest import Client
         return Client(settings.TWILIO_ACCOUNT_SID, settings.TWILIO_AUTH_TOKEN)
     except Exception as exc:
-        logger.error("Failed to initialise Twilio client: %s", exc)
+        logger.error("Failed to initialize Twilio client: %s", exc)
         return None
 
 

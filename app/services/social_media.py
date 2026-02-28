@@ -8,6 +8,9 @@ from app.config import settings
 
 logger = logging.getLogger(__name__)
 
+# Facebook Graph API version — update here to apply across all calls
+FB_API_VERSION = "v18.0"
+
 
 def post_to_facebook(listing, agent, access_token: str) -> Optional[str]:
     """Post listing to a Facebook Page. Returns post_id or None on failure."""
@@ -18,7 +21,7 @@ def post_to_facebook(listing, agent, access_token: str) -> Optional[str]:
     # Resolve the page ID and page-level access token from the user token
     try:
         accounts_resp = requests.get(
-            "https://graph.facebook.com/v18.0/me/accounts",
+            f"https://graph.facebook.com/{FB_API_VERSION}/me/accounts",
             params={"access_token": access_token},
             timeout=15,
         )
@@ -41,7 +44,7 @@ def post_to_facebook(listing, agent, access_token: str) -> Optional[str]:
         if media_urls:
             photo_url = media_urls[0]
             resp = requests.post(
-                f"https://graph.facebook.com/v18.0/{page_id}/photos",
+                f"https://graph.facebook.com/{FB_API_VERSION}/{page_id}/photos",
                 data={
                     "url": photo_url,
                     "caption": caption,
@@ -51,7 +54,7 @@ def post_to_facebook(listing, agent, access_token: str) -> Optional[str]:
             )
         else:
             resp = requests.post(
-                f"https://graph.facebook.com/v18.0/{page_id}/feed",
+                f"https://graph.facebook.com/{FB_API_VERSION}/{page_id}/feed",
                 data={"message": caption, "access_token": page_token},
                 timeout=30,
             )
@@ -76,7 +79,7 @@ def post_to_instagram(listing, agent, access_token: str) -> Optional[str]:
     try:
         # Step 1: resolve IG business account ID
         ig_resp = requests.get(
-            "https://graph.facebook.com/v18.0/me",
+            f"https://graph.facebook.com/{FB_API_VERSION}/me",
             params={"fields": "instagram_business_account", "access_token": access_token},
             timeout=15,
         )
@@ -95,7 +98,7 @@ def post_to_instagram(listing, agent, access_token: str) -> Optional[str]:
             container_params["image_url"] = ""
 
         container_resp = requests.post(
-            f"https://graph.facebook.com/v18.0/{ig_id}/media",
+            f"https://graph.facebook.com/{FB_API_VERSION}/{ig_id}/media",
             data=container_params,
             timeout=30,
         )
@@ -104,7 +107,7 @@ def post_to_instagram(listing, agent, access_token: str) -> Optional[str]:
 
         # Step 3: publish the container
         publish_resp = requests.post(
-            f"https://graph.facebook.com/v18.0/{ig_id}/media_publish",
+            f"https://graph.facebook.com/{FB_API_VERSION}/{ig_id}/media_publish",
             data={"creation_id": container_id, "access_token": access_token},
             timeout=30,
         )
