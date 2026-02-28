@@ -221,6 +221,86 @@ Set `BASE_URL` to your server's public domain (e.g. `https://yourapp.com`) and p
 
 ---
 
+## How to Start Chatting with the Bot on WhatsApp
+
+> **⚠️ WhatsApp groups are not supported.**  
+> The WhatsApp Business API (which Twilio uses) only allows **1-to-1 direct messages** between the bot's number and an individual user. You cannot add the bot to a WhatsApp group — messages sent in groups are not delivered to the bot.  
+> To interact with the bot, every person (agent or lead) messages the bot's Twilio number directly, in their own private chat.
+
+---
+
+### Step 1 — Join the Twilio WhatsApp Sandbox (testing only)
+
+During development Twilio provides a free shared sandbox number (`+1 415 523 8886`).  
+Each person who wants to message the bot must opt in once by sending a join code.
+
+1. **Open WhatsApp** on your phone.  
+2. **Save** the Twilio sandbox number in your contacts:  
+   `+1 415 523 8886`  
+3. **Send this exact message** to that number:  
+   ```
+   join <your-sandbox-keyword>
+   ```  
+   Find your sandbox keyword in [Twilio Console](https://console.twilio.com) → **Messaging** → **Try it out** → **Send a WhatsApp message**.  
+   It looks something like `join apple-mango`.  
+4. Twilio replies **"You are now connected"** — the opt-in is complete.
+
+> The sandbox number and keyword are the same for every Twilio account.  
+> In production you get your own approved WhatsApp Business number and the join step is not required.
+
+---
+
+### Step 2 — Register as an agent (so the bot recognises you)
+
+The bot treats every unregistered sender as a *lead*. To send agent commands (`POST`, `LIST`, `LEADS`, etc.) your WhatsApp number must be registered as an agent first.
+
+Use the API (while the server is running at `http://localhost:8000`):
+
+```bash
+curl -s -X POST http://localhost:8000/portal/agent/ \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Your Name",
+    "email": "you@example.com",
+    "phone": "+15550001234",
+    "whatsapp_number": "whatsapp:+15550001234"
+  }' | python3 -m json.tool
+```
+
+Replace `+15550001234` with your **real WhatsApp number** (the same one you used in Step 1).  
+The `whatsapp:` prefix is required — e.g. `whatsapp:+447700900000`.
+
+Or use the interactive docs at `http://localhost:8000/docs` → `POST /portal/agent/`.
+
+---
+
+### Step 3 — Send your first message
+
+Open the chat with the Twilio sandbox number on your phone and type:
+
+```
+HELP
+```
+
+The bot replies with the full list of available commands.  
+Try `LIST` to see listings or `POST <description>` with a photo attached to create one.
+
+---
+
+### Production path (approved WhatsApp Business number)
+
+When you're ready to go live:
+
+1. Apply for a **WhatsApp Business number** through Twilio (or directly via Meta):  
+   [https://www.twilio.com/whatsapp/request-access](https://www.twilio.com/whatsapp/request-access)
+2. Update `.env` with the new number:  
+   ```env
+   TWILIO_WHATSAPP_NUMBER=whatsapp:+<your-approved-number>
+   ```
+3. Users no longer need to send a join code — they simply message your business number directly.
+
+---
+
 ## Environment Variables
 
 ### Required to enable WhatsApp messaging
