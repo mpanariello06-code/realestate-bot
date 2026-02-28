@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RealEstate Bot — Clients</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../shared/styles.css" />
+  <style>
+    .sidebar-logo .logo-icon { background: linear-gradient(135deg, #ef4444, #b91c1c); }
+    .nav-item.active { color: #f87171; border-left-color: #ef4444; background: rgba(239,68,68,0.12); }
+    .btn-primary { background: #ef4444; } .btn-primary:hover { background: #f87171; }
+  </style>
+</head>
+<body>
+<div class="app-layout">
+
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-icon"><i class="fa-solid fa-shield-halved"></i></div>
+      <div><div class="logo-text">RealEstate Bot</div><div class="logo-sub">Admin Portal</div></div>
+    </div>
+    <nav class="sidebar-nav">
+      <span class="nav-section-label">Management</span>
+      <button class="nav-item" onclick="nav('dashboard.html')"><i class="fa-solid fa-gauge-high"></i> Dashboard</button>
+      <button class="nav-item active" onclick="nav('clients.html')"><i class="fa-solid fa-users"></i> Clients</button>
+      <button class="nav-item" onclick="nav('invoices.html')"><i class="fa-solid fa-file-invoice-dollar"></i> Invoices</button>
+      <span class="nav-section-label">Account</span>
+      <button class="nav-item danger" onclick="signOut()"><i class="fa-solid fa-right-from-bracket"></i> Sign Out</button>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="user-info">
+        <div class="user-avatar" style="background:linear-gradient(135deg,#ef4444,#b91c1c)" id="userAvatarInitial">A</div>
+        <div><div class="user-name" id="sidebarName">Admin</div><div class="user-role">System Administrator</div></div>
+      </div>
+    </div>
+  </aside>
+
+  <div class="main-content">
+    <header class="top-header">
+      <div class="header-title"><h1>Clients</h1><p>Manage all registered agents</p></div>
+      <div class="header-actions">
+        <button class="btn btn-primary" onclick="openModal('addClientModal')"><i class="fa-solid fa-user-plus"></i> Add Client</button>
+        <button class="btn btn-outline btn-sm" onclick="exportClients()"><i class="fa-solid fa-download"></i> Export</button>
+      </div>
+    </header>
+
+    <div class="page-body">
+      <div class="toolbar">
+        <div class="search-box">
+          <i class="fa-solid fa-magnifying-glass"></i>
+          <input type="text" id="searchInput" placeholder="Search by name, email…" oninput="onSearch()" />
+        </div>
+        <button class="filter-btn active" onclick="setFilter('all',this)">All</button>
+        <button class="filter-btn" onclick="setFilter('active',this)">Active</button>
+        <button class="filter-btn" onclick="setFilter('inactive',this)">Inactive</button>
+        <select class="form-select" id="planFilter" onchange="loadClients()" style="width:130px;padding:8px 10px">
+          <option value="">All Plans</option>
+          <option value="basic">Basic</option>
+          <option value="pro">Pro</option>
+          <option value="enterprise">Enterprise</option>
+        </select>
+      </div>
+
+      <div class="card" style="padding:0;overflow:hidden">
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Client</th><th>Phone</th><th>Plan</th><th>Status</th><th>Listings</th><th>Leads</th><th>Deals</th><th>Joined</th><th>Actions</th></tr>
+            </thead>
+            <tbody id="clientsBody">
+              <tr><td colspan="9" style="text-align:center;padding:40px"><div class="spinner"></div></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="pagination" id="pagination" style="padding:16px"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Add Client Modal -->
+<div class="modal-overlay" id="addClientModal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title" id="clientFormTitle">Add New Client</span>
+      <button class="modal-close" onclick="closeModal('addClientModal')"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <form onsubmit="submitClient(event)">
+      <div class="form-group">
+        <label class="form-label">Full Name</label>
+        <input type="text" class="form-input" id="cfName" required />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Email Address</label>
+        <input type="email" class="form-input" id="cfEmail" required />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Phone</label>
+        <input type="tel" class="form-input" id="cfPhone" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Plan</label>
+        <select class="form-select" id="cfPlan">
+          <option value="basic">Basic</option>
+          <option value="pro">Pro</option>
+          <option value="enterprise">Enterprise</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Temporary Password</label>
+        <input type="password" class="form-input" id="cfPassword" required />
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline" onclick="closeModal('addClientModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary" id="clientSubmitBtn"><i class="fa-solid fa-user-plus"></i> Add Client</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div id="toast-container"></div>
+<script src="../shared/api.js"></script>
+<script src="admin.js"></script>
+<script>
+  let currentPage = 1, totalPages = 1, currentFilter = 'all', searchQuery = '';
+  const PER_PAGE = 15;
+
+  function nav(p) { window.location.href = p; }
+  async function signOut() { await window.electronAPI.storeDelete('admin_token'); window.location.href = 'login.html'; }
+
+  async function init() {
+    const user = await checkAdminAuth();
+    if (!user) return;
+    const name = user.full_name || user.email || 'Admin';
+    document.getElementById('sidebarName').textContent = name;
+    document.getElementById('userAvatarInitial').textContent = name[0].toUpperCase();
+    await loadClients();
+  }
+
+  let searchTimer;
+  function onSearch() {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(() => { searchQuery = document.getElementById('searchInput').value; currentPage = 1; loadClients(); }, 300);
+  }
+
+  function setFilter(f, el) {
+    currentFilter = f; currentPage = 1;
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    el.classList.add('active');
+    loadClients();
+  }
+
+  async function loadClients() {
+    const params = new URLSearchParams({ page: currentPage, limit: PER_PAGE });
+    if (currentFilter !== 'all') params.set('status', currentFilter);
+    if (searchQuery) params.set('search', searchQuery);
+    const plan = document.getElementById('planFilter').value;
+    if (plan) params.set('plan', plan);
+
+    const res = await adminRequest('GET', `/admin/clients?${params}`);
+    const items = res.ok ? (res.data.items || res.data) : [];
+    const total = res.ok ? (res.data.total || items.length) : 0;
+    totalPages = Math.max(1, Math.ceil(total / PER_PAGE));
+    renderClients(items);
+    renderPagination();
+  }
+
+  function renderClients(clients) {
+    const tbody = document.getElementById('clientsBody');
+    if (!clients.length) {
+      tbody.innerHTML = `<tr><td colspan="9"><div class="empty-state"><i class="fa-solid fa-users"></i><h3>No clients found</h3></div></td></tr>`;
+      return;
+    }
+    tbody.innerHTML = clients.map(c => `
+      <tr>
+        <td><div style="display:flex;align-items:center;gap:9px">
+          <div class="avatar" style="width:30px;height:30px;font-size:12px">${(c.full_name||'?')[0]}</div>
+          <div><div style="font-weight:600">${c.full_name||'—'}</div><div style="font-size:11px;color:var(--text-secondary)">${c.email||''}</div></div>
+        </div></td>
+        <td style="color:var(--text-secondary);font-size:12.5px">${c.phone||'—'}</td>
+        <td><span class="badge badge-purple">${c.plan||'Basic'}</span></td>
+        <td>${getStatusBadge(c.status||'active')}</td>
+        <td>${c.active_listings||0}</td>
+        <td>${c.total_leads||0}</td>
+        <td>${c.deals_closed||0}</td>
+        <td style="font-size:12px;color:var(--text-secondary)">${formatDate(c.created_at)}</td>
+        <td>
+          <div style="display:flex;gap:6px">
+            <button class="btn btn-outline btn-sm" onclick="nav('client-detail.html?id=${c.id}')" title="View"><i class="fa-solid fa-eye"></i></button>
+            <button class="btn btn-outline btn-sm" onclick="createInvoice('${c.id}','${c.full_name||''}')" title="Invoice"><i class="fa-solid fa-file-invoice"></i></button>
+            <button class="btn btn-danger btn-sm" onclick="suspendClient('${c.id}','${c.status}')" title="${c.status==='active'?'Suspend':'Activate'}">
+              <i class="fa-solid fa-${c.status==='active'?'ban':'circle-check'}"></i>
+            </button>
+          </div>
+        </td>
+      </tr>`).join('');
+  }
+
+  function renderPagination() {
+    const pag = document.getElementById('pagination');
+    if (totalPages <= 1) { pag.innerHTML = ''; return; }
+    let html = `<button class="page-btn" onclick="goPage(${currentPage-1})" ${currentPage===1?'disabled':''}><i class="fa-solid fa-chevron-left"></i></button>`;
+    for (let i = 1; i <= totalPages; i++) html += `<button class="page-btn ${i===currentPage?'active':''}" onclick="goPage(${i})">${i}</button>`;
+    html += `<button class="page-btn" onclick="goPage(${currentPage+1})" ${currentPage===totalPages?'disabled':''}><i class="fa-solid fa-chevron-right"></i></button>`;
+    pag.innerHTML = html;
+  }
+
+  function goPage(p) { if (p < 1 || p > totalPages) return; currentPage = p; loadClients(); }
+
+  async function submitClient(e) {
+    e.preventDefault();
+    const btn = document.getElementById('clientSubmitBtn');
+    btn.disabled = true;
+    const body = {
+      full_name: document.getElementById('cfName').value,
+      email:     document.getElementById('cfEmail').value,
+      phone:     document.getElementById('cfPhone').value,
+      plan:      document.getElementById('cfPlan').value,
+      password:  document.getElementById('cfPassword').value,
+      role: 'client',
+    };
+    const res = await adminRequest('POST', '/admin/clients', body);
+    btn.disabled = false;
+    if (res.ok) {
+      showToast('success', 'Client added', `${body.full_name} has been registered.`);
+      closeModal('addClientModal');
+      document.querySelectorAll('#addClientModal input,#addClientModal select').forEach(el => el.value = '');
+      loadClients();
+    } else {
+      showToast('error', 'Error', res.data?.detail || 'Failed to add client.');
+    }
+  }
+
+  async function suspendClient(id, currentStatus) {
+    const newStatus = currentStatus === 'active' ? 'inactive' : 'active';
+    const res = await adminRequest('PATCH', `/admin/clients/${id}`, { status: newStatus });
+    if (res.ok) { showToast('success', `Client ${newStatus === 'active' ? 'activated' : 'suspended'}`); loadClients(); }
+    else showToast('error', 'Error', 'Failed to update client.');
+  }
+
+  function createInvoice(clientId, clientName) {
+    window.location.href = `invoices.html?client_id=${clientId}&client_name=${encodeURIComponent(clientName)}`;
+  }
+
+  async function exportClients() {
+    showToast('info', 'Exporting…');
+    const res = await adminRequest('GET', '/admin/clients?limit=1000');
+    if (res.ok) exportToCSV(res.data.items || res.data, 'clients.csv');
+    else showToast('error', 'Export failed');
+  }
+
+  init();
+</script>
+</body>
+</html>

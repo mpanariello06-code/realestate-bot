@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RealEstate Bot — Select Portal</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg-primary: #0f0f1a; --bg-secondary: #1a1a2e; --bg-card: #16213e;
+      --accent-purple: #7c3aed; --accent-gold: #f59e0b;
+      --text-primary: #e2e8f0; --text-secondary: #94a3b8; --border: #2d3748;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg-primary); color: var(--text-primary);
+      height: 100vh; display: flex; align-items: center; justify-content: center;
+    }
+    .container { text-align: center; padding: 40px 32px; width: 100%; }
+    .logo { margin-bottom: 32px; }
+    .logo-icon {
+      width: 64px; height: 64px; border-radius: 18px; margin: 0 auto 16px;
+      background: linear-gradient(135deg, var(--accent-purple), var(--accent-gold));
+      display: flex; align-items: center; justify-content: center; font-size: 28px;
+    }
+    .logo h1 { font-size: 24px; font-weight: 800; }
+    .logo p { color: var(--text-secondary); font-size: 13px; margin-top: 4px; }
+    .portals { display: flex; gap: 16px; margin-top: 8px; }
+    .portal-btn {
+      flex: 1; background: var(--bg-card); border: 2px solid var(--border);
+      border-radius: 16px; padding: 28px 20px; cursor: pointer;
+      transition: all 0.2s; color: var(--text-primary);
+      display: flex; flex-direction: column; align-items: center; gap: 12px;
+    }
+    .portal-btn:hover { transform: translateY(-3px); box-shadow: 0 12px 40px rgba(0,0,0,0.4); }
+    .portal-btn.client:hover { border-color: var(--accent-purple); }
+    .portal-btn.admin:hover  { border-color: #ef4444; }
+    .portal-icon {
+      width: 52px; height: 52px; border-radius: 14px;
+      display: flex; align-items: center; justify-content: center; font-size: 22px;
+    }
+    .portal-btn.client .portal-icon { background: rgba(124,58,237,0.15); color: #a78bfa; }
+    .portal-btn.admin  .portal-icon { background: rgba(239,68,68,0.15);  color: #f87171; }
+    .portal-label { font-size: 15px; font-weight: 700; }
+    .portal-desc  { font-size: 12px; color: var(--text-secondary); line-height: 1.4; }
+    .footer { margin-top: 28px; font-size: 11px; color: var(--text-secondary); }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="logo">
+      <div class="logo-icon"><i class="fa-solid fa-house-chimney"></i></div>
+      <h1>RealEstate Bot</h1>
+      <p>Agent Automation Platform</p>
+    </div>
+    <div class="portals">
+      <button class="portal-btn client" onclick="openClient()">
+        <div class="portal-icon"><i class="fa-solid fa-user-tie"></i></div>
+        <span class="portal-label">Client Portal</span>
+        <span class="portal-desc">For real estate agents to manage leads &amp; listings</span>
+      </button>
+      <button class="portal-btn admin" onclick="openAdmin()">
+        <div class="portal-icon"><i class="fa-solid fa-shield-halved"></i></div>
+        <span class="portal-label">Admin Portal</span>
+        <span class="portal-desc">For system administrators to manage all clients</span>
+      </button>
+    </div>
+    <div class="footer">v1.0.0 — Backend: http://localhost:8000</div>
+  </div>
+  <script>
+    function openClient() { window.electronAPI.openClientPortal(); }
+    function openAdmin()  { window.electronAPI.openAdminPortal(); }
+  </script>
+</body>
+</html>

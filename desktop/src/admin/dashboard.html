@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RealEstate Bot — Admin Dashboard</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../shared/styles.css" />
+  <style>
+    .sidebar-logo .logo-icon { background: linear-gradient(135deg, #ef4444, #b91c1c); }
+    .nav-item.active { color: #f87171; border-left-color: #ef4444; background: rgba(239,68,68,0.12); }
+    .nav-item:hover  { background: rgba(239,68,68,0.08); }
+    .btn-primary     { background: #ef4444; } .btn-primary:hover { background: #f87171; }
+    .stat-card:hover { border-color: #ef4444; }
+    .activity-item { display:flex;align-items:flex-start;gap:12px;padding:12px 0;border-bottom:1px solid var(--border); }
+    .activity-item:last-child { border-bottom:none; }
+    .activity-dot { width:8px;height:8px;border-radius:50%;background:var(--accent-purple);flex-shrink:0;margin-top:6px; }
+  </style>
+</head>
+<body>
+<div class="app-layout">
+
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-icon"><i class="fa-solid fa-shield-halved"></i></div>
+      <div><div class="logo-text">RealEstate Bot</div><div class="logo-sub">Admin Portal</div></div>
+    </div>
+    <nav class="sidebar-nav">
+      <span class="nav-section-label">Management</span>
+      <button class="nav-item active" onclick="nav('dashboard.html')"><i class="fa-solid fa-gauge-high"></i> Dashboard</button>
+      <button class="nav-item" onclick="nav('clients.html')"><i class="fa-solid fa-users"></i> Clients</button>
+      <button class="nav-item" onclick="nav('invoices.html')"><i class="fa-solid fa-file-invoice-dollar"></i> Invoices</button>
+      <span class="nav-section-label">Account</span>
+      <button class="nav-item danger" onclick="signOut()"><i class="fa-solid fa-right-from-bracket"></i> Sign Out</button>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="user-info">
+        <div class="user-avatar" style="background:linear-gradient(135deg,#ef4444,#b91c1c)" id="userAvatarInitial">A</div>
+        <div><div class="user-name" id="sidebarName">Admin</div><div class="user-role">System Administrator</div></div>
+      </div>
+    </div>
+  </aside>
+
+  <div class="main-content">
+    <header class="top-header">
+      <div class="header-title">
+        <h1 id="greetingText">Admin Dashboard</h1>
+        <p id="todayDate">Overview</p>
+      </div>
+      <div class="header-actions">
+        <button class="btn btn-primary btn-sm" onclick="nav('clients.html')"><i class="fa-solid fa-user-plus"></i> Add Client</button>
+        <button class="btn btn-outline btn-sm" onclick="nav('invoices.html')"><i class="fa-solid fa-file-invoice"></i> Create Invoice</button>
+      </div>
+    </header>
+
+    <div class="page-body">
+      <div class="offline-banner" id="offlineBanner" style="display:none">
+        <i class="fa-solid fa-triangle-exclamation"></i> Backend server is not running.
+      </div>
+
+      <!-- Stats -->
+      <div class="stats-grid">
+        <div class="stat-card"><div><div class="stat-label">Total Clients</div><div class="stat-value" id="statTotal">—</div></div><div class="stat-icon purple"><i class="fa-solid fa-users"></i></div></div>
+        <div class="stat-card"><div><div class="stat-label">Active Clients</div><div class="stat-value" id="statActive">—</div></div><div class="stat-icon green"><i class="fa-solid fa-circle-check"></i></div></div>
+        <div class="stat-card"><div><div class="stat-label">Leads This Month</div><div class="stat-value" id="statLeads">—</div></div><div class="stat-icon gold"><i class="fa-solid fa-user-plus"></i></div></div>
+        <div class="stat-card"><div><div class="stat-label">Total Revenue</div><div class="stat-value" id="statRevenue">—</div></div><div class="stat-icon blue"><i class="fa-solid fa-dollar-sign"></i></div></div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 340px;gap:24px">
+        <!-- Clients Table -->
+        <div class="card">
+          <div class="card-header">
+            <div><div class="card-title">Clients</div><div class="card-subtitle">All registered agents</div></div>
+            <button class="btn btn-outline btn-sm" onclick="nav('clients.html')">View All</button>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Name</th><th>Plan</th><th>Listings</th><th>Leads</th><th>Payment</th></tr></thead>
+              <tbody id="clientsBody">
+                <tr><td colspan="5" style="text-align:center;padding:30px"><div class="spinner"></div></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Activity + Quick actions -->
+        <div>
+          <div class="card" style="margin-bottom:20px">
+            <div class="card-title" style="margin-bottom:16px">Quick Actions</div>
+            <div style="display:flex;flex-direction:column;gap:10px">
+              <button class="btn btn-primary" onclick="nav('clients.html')"><i class="fa-solid fa-user-plus"></i> Add Client</button>
+              <button class="btn btn-outline" onclick="nav('invoices.html')"><i class="fa-solid fa-file-invoice"></i> Create Invoice</button>
+              <button class="btn btn-outline" onclick="exportAllLeads()"><i class="fa-solid fa-download"></i> Export All Leads</button>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-title" style="margin-bottom:16px">Recent Activity</div>
+            <div id="activityLog">
+              <div style="color:var(--text-secondary)"><div class="spinner"></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Revenue Chart -->
+      <div class="card" style="margin-top:0">
+        <div class="card-header"><div class="card-title">Revenue (Last 12 Months)</div></div>
+        <canvas id="revenueChart" height="160"></canvas>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="toast-container"></div>
+<script src="../shared/api.js"></script>
+<script src="admin.js"></script>
+<script>
+  function nav(p) { window.location.href = p; }
+  async function signOut() { await window.electronAPI.storeDelete('admin_token'); window.location.href = 'login.html'; }
+
+  async function init() {
+    const user = await checkAdminAuth();
+    if (!user) return;
+    const name = user.full_name || user.email || 'Admin';
+    document.getElementById('sidebarName').textContent = name;
+    document.getElementById('userAvatarInitial').textContent = name[0].toUpperCase();
+    document.getElementById('greetingText').textContent = `Welcome back, ${name.split(' ')[0]}`;
+    document.getElementById('todayDate').textContent = new Date().toLocaleDateString('en-US', { weekday:'long', month:'long', day:'numeric' });
+    await loadDashboard();
+  }
+
+  async function loadDashboard() {
+    const [statsRes, clientsRes, activityRes] = await Promise.all([
+      adminRequest('GET', '/admin/stats'),
+      adminRequest('GET', '/admin/clients?limit=8&order=desc'),
+      adminRequest('GET', '/admin/activity?limit=8'),
+    ]);
+
+    document.getElementById('offlineBanner').style.display = (!statsRes.ok && statsRes.status === 0) ? 'flex' : 'none';
+
+    if (statsRes.ok) {
+      const s = statsRes.data;
+      document.getElementById('statTotal').textContent   = s.total_clients  ?? '—';
+      document.getElementById('statActive').textContent  = s.active_clients ?? '—';
+      document.getElementById('statLeads').textContent   = s.total_leads    ?? '—';
+      document.getElementById('statRevenue').textContent = s.total_revenue != null ? formatCurrency(s.total_revenue) : '—';
+    }
+
+    renderClientsTable(clientsRes.ok ? (clientsRes.data.items || clientsRes.data) : []);
+    renderActivity(activityRes.ok ? (activityRes.data.items || activityRes.data) : []);
+    drawRevenueChart(statsRes.ok && statsRes.data.revenue_months ? statsRes.data.revenue_months : null);
+  }
+
+  function renderClientsTable(clients) {
+    const tbody = document.getElementById('clientsBody');
+    if (!clients.length) { tbody.innerHTML = '<tr><td colspan="5"><div class="empty-state"><i class="fa-solid fa-users"></i><h3>No clients yet</h3></div></td></tr>'; return; }
+    tbody.innerHTML = clients.map(c => `
+      <tr style="cursor:pointer" onclick="nav('client-detail.html?id=${c.id}')">
+        <td><div style="display:flex;align-items:center;gap:9px">
+          <div class="avatar" style="width:28px;height:28px;font-size:11px">${(c.full_name||'?')[0]}</div>
+          <div><div style="font-weight:600">${c.full_name||'—'}</div><div style="font-size:11px;color:var(--text-secondary)">${c.email||''}</div></div>
+        </div></td>
+        <td><span class="badge badge-purple">${c.plan||'Basic'}</span></td>
+        <td>${c.active_listings||0}</td>
+        <td>${c.total_leads||0}</td>
+        <td>${getStatusBadge(c.payment_status||'pending')}</td>
+      </tr>`).join('');
+  }
+
+  function renderActivity(activities) {
+    const el = document.getElementById('activityLog');
+    if (!activities.length) { el.innerHTML = '<div style="color:var(--text-secondary);font-size:13px">No recent activity.</div>'; return; }
+    el.innerHTML = activities.map(a => `
+      <div class="activity-item">
+        <div class="activity-dot" style="background:${a.type==='lead'?'var(--accent-gold)':a.type==='deal'?'var(--success)':'var(--accent-purple)'}"></div>
+        <div>
+          <div style="font-size:13px;font-weight:500">${a.message||'—'}</div>
+          <div style="font-size:11px;color:var(--text-secondary);margin-top:2px">${formatRelative(a.created_at)}</div>
+        </div>
+      </div>`).join('');
+  }
+
+  function drawRevenueChart(monthData) {
+    const canvas = document.getElementById('revenueChart');
+    canvas.width = canvas.parentElement.clientWidth - 48;
+    const ctx = canvas.getContext('2d');
+    const W = canvas.width, H = canvas.height;
+
+    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const data = monthData || months.map(() => Math.floor(Math.random() * 5000) + 1000);
+    const max = Math.max(...data) * 1.2;
+    const pad = { t:10, b:24, l:10, r:10 };
+    const aw = W - pad.l - pad.r, ah = H - pad.t - pad.b;
+    const bw = (aw / data.length) * 0.6;
+
+    ctx.clearRect(0,0,W,H);
+    data.forEach((v,i) => {
+      const x = pad.l + (aw / data.length) * i + (aw / data.length - bw) / 2;
+      const bh = (v / max) * ah;
+      const y = pad.t + ah - bh;
+      const grad = ctx.createLinearGradient(0,y,0,y+bh);
+      grad.addColorStop(0,'rgba(239,68,68,0.8)'); grad.addColorStop(1,'rgba(239,68,68,0.2)');
+      ctx.fillStyle = grad;
+      const r = 4;
+      ctx.beginPath();
+      ctx.moveTo(x+r, y); ctx.lineTo(x+bw-r, y);
+      ctx.arcTo(x+bw,y, x+bw,y+r, r); ctx.lineTo(x+bw, y+bh); ctx.lineTo(x, y+bh);
+      ctx.arcTo(x,y, x+r,y, r); ctx.closePath();
+      ctx.fill();
+
+      ctx.fillStyle = '#94a3b8'; ctx.font = '10px Inter'; ctx.textAlign = 'center';
+      ctx.fillText(months[i], x + bw/2, H - 4);
+    });
+  }
+
+  async function exportAllLeads() {
+    showToast('info', 'Exporting…', 'Fetching all leads from server.');
+    const res = await adminRequest('GET', '/admin/leads/export');
+    if (res.ok) { exportToCSV(res.data, 'all-leads.csv'); showToast('success', 'Exported!'); }
+    else showToast('error', 'Error', 'Failed to export leads.');
+  }
+
+  init();
+</script>
+</body>
+</html>

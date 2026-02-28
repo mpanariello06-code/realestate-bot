@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RealEstate Bot — Listings</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../shared/styles.css" />
+</head>
+<body>
+<div class="app-layout">
+
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-icon"><i class="fa-solid fa-house-chimney"></i></div>
+      <div><div class="logo-text">RealEstate Bot</div><div class="logo-sub">Client Portal</div></div>
+    </div>
+    <nav class="sidebar-nav">
+      <span class="nav-section-label">Main</span>
+      <button class="nav-item" onclick="nav('dashboard.html')"><i class="fa-solid fa-gauge-high"></i> Dashboard</button>
+      <button class="nav-item active" onclick="nav('listings.html')"><i class="fa-solid fa-building"></i> Listings</button>
+      <button class="nav-item" onclick="nav('leads.html')"><i class="fa-solid fa-users"></i> Leads</button>
+      <button class="nav-item" onclick="nav('performance.html')"><i class="fa-solid fa-chart-line"></i> Performance</button>
+      <span class="nav-section-label">Account</span>
+      <button class="nav-item" onclick="nav('settings.html')"><i class="fa-solid fa-gear"></i> Settings</button>
+      <button class="nav-item danger" onclick="signOut()"><i class="fa-solid fa-right-from-bracket"></i> Sign Out</button>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="user-info">
+        <div class="user-avatar" id="userAvatarInitial">A</div>
+        <div><div class="user-name" id="sidebarName">Agent</div><div class="user-role">Real Estate Agent</div></div>
+      </div>
+    </div>
+  </aside>
+
+  <div class="main-content">
+    <header class="top-header">
+      <div class="header-title"><h1>Listings</h1><p>Manage your property listings</p></div>
+      <div class="header-actions">
+        <button class="btn btn-primary" onclick="openModal('listingFormModal')"><i class="fa-solid fa-plus"></i> Post New Listing</button>
+      </div>
+    </header>
+
+    <div class="page-body">
+      <div class="toolbar">
+        <div class="search-box">
+          <i class="fa-solid fa-magnifying-glass"></i>
+          <input type="text" id="searchInput" placeholder="Search listings…" oninput="onSearch()" />
+        </div>
+        <button class="filter-btn active" onclick="setFilter('all', this)">All</button>
+        <button class="filter-btn" onclick="setFilter('for sale', this)">For Sale</button>
+        <button class="filter-btn" onclick="setFilter('for rent', this)">For Rent</button>
+        <button class="filter-btn" onclick="setFilter('sold', this)">Sold</button>
+      </div>
+
+      <div class="listings-grid" id="listingsGrid">
+        <div style="color:var(--text-secondary);padding:20px"><div class="spinner"></div></div>
+      </div>
+      <div class="pagination" id="pagination" style="margin-top:24px"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Listing Form Modal -->
+<div class="modal-overlay" id="listingFormModal">
+  <div class="modal modal-lg">
+    <div class="modal-header">
+      <span class="modal-title" id="listingFormTitle">Post New Listing</span>
+      <button class="modal-close" onclick="closeModal('listingFormModal')"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <form id="listingForm" onsubmit="submitListing(event)">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+        <div class="form-group" style="grid-column:1/-1">
+          <label class="form-label">Property Title</label>
+          <input type="text" class="form-input" id="fTitle" placeholder="3BR Modern House in Beverly Hills" required />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Price ($)</label>
+          <input type="number" class="form-input" id="fPrice" placeholder="550000" required />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Status</label>
+          <select class="form-select" id="fStatus">
+            <option value="for sale">For Sale</option>
+            <option value="for rent">For Rent</option>
+            <option value="sold">Sold</option>
+          </select>
+        </div>
+        <div class="form-group" style="grid-column:1/-1">
+          <label class="form-label">Location</label>
+          <input type="text" class="form-input" id="fLocation" placeholder="Beverly Hills, CA 90210" required />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Bedrooms</label>
+          <input type="number" class="form-input" id="fBeds" placeholder="3" min="0" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Bathrooms</label>
+          <input type="number" class="form-input" id="fBaths" placeholder="2" min="0" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Area (sqft)</label>
+          <input type="number" class="form-input" id="fArea" placeholder="2200" min="0" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Year Built</label>
+          <input type="number" class="form-input" id="fYear" placeholder="2018" />
+        </div>
+        <div class="form-group" style="grid-column:1/-1">
+          <label class="form-label">Description</label>
+          <textarea class="form-textarea" id="fDesc" placeholder="Describe the property…" style="min-height:100px"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline" onclick="closeModal('listingFormModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary" id="listingSubmitBtn"><i class="fa-solid fa-paper-plane"></i> Post Listing</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div id="toast-container"></div>
+<script src="../shared/api.js"></script>
+<script>
+  let currentPage = 1, totalPages = 1, currentFilter = 'all', searchQuery = '', editingId = null;
+  const PER_PAGE = 12;
+
+  function nav(p) { window.location.href = p; }
+  async function signOut() { await window.electronAPI.storeDelete('auth_token'); window.location.href = 'login.html'; }
+
+  async function init() {
+    const user = await checkAuth();
+    if (!user) return;
+    const name = user.full_name || user.email || 'Agent';
+    document.getElementById('sidebarName').textContent = name;
+    document.getElementById('userAvatarInitial').textContent = name[0].toUpperCase();
+    await loadListings();
+  }
+
+  let searchTimer;
+  function onSearch() {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(() => { searchQuery = document.getElementById('searchInput').value; currentPage = 1; loadListings(); }, 300);
+  }
+
+  function setFilter(f, el) {
+    currentFilter = f; currentPage = 1;
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    el.classList.add('active');
+    loadListings();
+  }
+
+  async function loadListings() {
+    const params = new URLSearchParams({ page: currentPage, limit: PER_PAGE });
+    if (currentFilter !== 'all') params.set('status', currentFilter);
+    if (searchQuery) params.set('search', searchQuery);
+    const res = await apiRequest('GET', `/listings?${params}`);
+    const items = res.ok ? (res.data.items || res.data) : [];
+    const total = res.ok ? (res.data.total || items.length) : 0;
+    totalPages = Math.max(1, Math.ceil(total / PER_PAGE));
+    renderListings(items);
+    renderPagination();
+  }
+
+  // Store listing data by id to avoid unsafe inline serialisation
+  const listingStore = {};
+
+  function renderListings(listings) {
+    const grid = document.getElementById('listingsGrid');
+    if (!listings.length) {
+      grid.innerHTML = '<div class="empty-state" style="grid-column:1/-1"><i class="fa-solid fa-building"></i><h3>No listings found</h3><p>Post your first listing to get started.</p></div>';
+      return;
+    }
+    listings.forEach(l => { listingStore[l.id] = l; });
+    grid.innerHTML = listings.map(l => `
+      <div class="listing-card">
+        <div class="listing-img"><i class="fa-solid fa-house"></i>
+          <span class="listing-status-badge">${getStatusBadge(l.status)}</span>
+        </div>
+        <div class="listing-body">
+          <div class="listing-title">${l.title||'Untitled'}</div>
+          <div class="listing-price">${formatCurrency(l.price||0)}</div>
+          <div class="listing-meta">
+            <span><i class="fa-solid fa-location-dot"></i> ${l.location||'—'}</span>
+            <span><i class="fa-solid fa-bed"></i> ${l.bedrooms||0}</span>
+            <span><i class="fa-solid fa-bath"></i> ${l.bathrooms||0}</span>
+            ${l.area ? `<span><i class="fa-solid fa-ruler-combined"></i> ${l.area} sqft</span>` : ''}
+          </div>
+          <div class="listing-social">
+            <span class="social-icon ${l.posted_facebook ? 'posted' : 'pending'}" title="Facebook"><i class="fa-brands fa-facebook"></i></span>
+            <span class="social-icon ${l.posted_instagram ? 'posted' : 'pending'}" title="Instagram"><i class="fa-brands fa-instagram"></i></span>
+            <span class="social-icon ${l.posted_tiktok ? 'posted' : 'pending'}" title="TikTok"><i class="fa-brands fa-tiktok"></i></span>
+          </div>
+          <div class="listing-stats">
+            <span><i class="fa-solid fa-eye"></i> ${l.views||0} views</span>
+            <span><i class="fa-solid fa-users"></i> ${l.leads_count||0} leads</span>
+          </div>
+          <div style="display:flex;gap:8px;margin-top:12px">
+            <button class="btn btn-outline btn-sm" style="flex:1" data-edit-id="${l.id}"><i class="fa-solid fa-pencil"></i> Edit</button>
+            <button class="btn btn-danger btn-sm" data-delete-id="${l.id}"><i class="fa-solid fa-trash"></i></button>
+          </div>
+        </div>
+      </div>`).join('');
+  }
+
+  function renderPagination() {
+    const pag = document.getElementById('pagination');
+    if (totalPages <= 1) { pag.innerHTML = ''; return; }
+    let html = `<button class="page-btn" onclick="goPage(${currentPage-1})" ${currentPage===1?'disabled':''}><i class="fa-solid fa-chevron-left"></i></button>`;
+    for (let i = 1; i <= totalPages; i++) {
+      html += `<button class="page-btn ${i===currentPage?'active':''}" onclick="goPage(${i})">${i}</button>`;
+    }
+    html += `<button class="page-btn" onclick="goPage(${currentPage+1})" ${currentPage===totalPages?'disabled':''}><i class="fa-solid fa-chevron-right"></i></button>`;
+    pag.innerHTML = html;
+  }
+
+  function goPage(p) { if (p < 1 || p > totalPages) return; currentPage = p; loadListings(); }
+
+  function editListing(l) {
+    editingId = l.id;
+    document.getElementById('listingFormTitle').textContent = 'Edit Listing';
+    document.getElementById('fTitle').value    = l.title || '';
+    document.getElementById('fPrice').value    = l.price || '';
+    document.getElementById('fStatus').value   = l.status || 'for sale';
+    document.getElementById('fLocation').value = l.location || '';
+    document.getElementById('fBeds').value     = l.bedrooms || '';
+    document.getElementById('fBaths').value    = l.bathrooms || '';
+    document.getElementById('fArea').value     = l.area || '';
+    document.getElementById('fYear').value     = l.year_built || '';
+    document.getElementById('fDesc').value     = l.description || '';
+    openModal('listingFormModal');
+  }
+
+  async function submitListing(e) {
+    e.preventDefault();
+    const btn = document.getElementById('listingSubmitBtn');
+    btn.disabled = true; btn.innerHTML = '<div class="spinner" style="width:16px;height:16px;border-width:2px"></div>';
+    const body = {
+      title: document.getElementById('fTitle').value,
+      price: parseFloat(document.getElementById('fPrice').value),
+      status: document.getElementById('fStatus').value,
+      location: document.getElementById('fLocation').value,
+      bedrooms: parseInt(document.getElementById('fBeds').value) || 0,
+      bathrooms: parseInt(document.getElementById('fBaths').value) || 0,
+      area: parseInt(document.getElementById('fArea').value) || null,
+      year_built: parseInt(document.getElementById('fYear').value) || null,
+      description: document.getElementById('fDesc').value,
+    };
+    const res = editingId
+      ? await apiRequest('PUT', `/listings/${editingId}`, body)
+      : await apiRequest('POST', '/listings', body);
+
+    btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Post Listing';
+    if (res.ok) {
+      showToast('success', editingId ? 'Listing updated' : 'Listing created', 'Your listing has been saved.');
+      closeModal('listingFormModal');
+      editingId = null;
+      document.getElementById('listingFormTitle').textContent = 'Post New Listing';
+      document.getElementById('listingForm').reset();
+      loadListings();
+    } else {
+      showToast('error', 'Error', res.data?.detail || 'Failed to save listing.');
+    }
+  }
+
+  async function deleteListing(id) {
+    const res = await apiRequest('DELETE', `/listings/${id}`);
+    if (res.ok) { showToast('success', 'Deleted', 'Listing removed.'); loadListings(); }
+    else showToast('error', 'Error', 'Failed to delete listing.');
+  }
+
+  // Event delegation — avoids unsafe inline onclick with serialised objects
+  document.getElementById('listingsGrid').addEventListener('click', (e) => {
+    const editBtn   = e.target.closest('[data-edit-id]');
+    const deleteBtn = e.target.closest('[data-delete-id]');
+    if (editBtn)   editListing(listingStore[editBtn.dataset.editId]);
+    if (deleteBtn) deleteListing(deleteBtn.dataset.deleteId);
+  });
+
+  init();
+</script>
+</body>
+</html>

@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RealEstate Bot — Dashboard</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../shared/styles.css" />
+</head>
+<body>
+<div class="app-layout">
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-icon"><i class="fa-solid fa-house-chimney"></i></div>
+      <div>
+        <div class="logo-text">RealEstate Bot</div>
+        <div class="logo-sub">Client Portal</div>
+      </div>
+    </div>
+    <nav class="sidebar-nav">
+      <span class="nav-section-label">Main</span>
+      <button class="nav-item active" onclick="nav('dashboard.html')"><i class="fa-solid fa-gauge-high"></i> Dashboard</button>
+      <button class="nav-item" onclick="nav('listings.html')"><i class="fa-solid fa-building"></i> Listings</button>
+      <button class="nav-item" onclick="nav('leads.html')"><i class="fa-solid fa-users"></i> Leads</button>
+      <button class="nav-item" onclick="nav('performance.html')"><i class="fa-solid fa-chart-line"></i> Performance</button>
+      <span class="nav-section-label">Account</span>
+      <button class="nav-item" onclick="nav('settings.html')"><i class="fa-solid fa-gear"></i> Settings</button>
+      <button class="nav-item danger" onclick="signOut()"><i class="fa-solid fa-right-from-bracket"></i> Sign Out</button>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="user-info">
+        <div class="user-avatar" id="userAvatarInitial">A</div>
+        <div>
+          <div class="user-name" id="sidebarName">Agent</div>
+          <div class="user-role">Real Estate Agent</div>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <div class="main-content">
+    <header class="top-header">
+      <div class="header-title">
+        <h1 id="greetingText">Good morning, Agent</h1>
+        <p id="todayDate">Today</p>
+      </div>
+      <div class="header-actions">
+        <button class="notif-btn" id="notifBtn"><i class="fa-solid fa-bell"></i><span class="notif-dot"></span></button>
+        <button class="btn btn-primary btn-sm" onclick="nav('listings.html')"><i class="fa-solid fa-plus"></i> New Listing</button>
+      </div>
+    </header>
+
+    <div class="page-body">
+      <div class="offline-banner" id="offlineBanner" style="display:none">
+        <i class="fa-solid fa-triangle-exclamation"></i>
+        <span>Backend server is not running. Some data may not be available.</span>
+      </div>
+
+      <!-- Stats -->
+      <div class="stats-grid" id="statsGrid">
+        <div class="stat-card"><div><div class="stat-label">Active Listings</div><div class="stat-value" id="statListings">—</div><div class="stat-change up" id="statListingsChange"></div></div><div class="stat-icon purple"><i class="fa-solid fa-building"></i></div></div>
+        <div class="stat-card"><div><div class="stat-label">New Leads</div><div class="stat-value" id="statNewLeads">—</div><div class="stat-change up" id="statNewLeadsChange"></div></div><div class="stat-icon gold"><i class="fa-solid fa-user-plus"></i></div></div>
+        <div class="stat-card"><div><div class="stat-label">Qualified Leads</div><div class="stat-value" id="statQualified">—</div><div class="stat-change up" id="statQualifiedChange"></div></div><div class="stat-icon green"><i class="fa-solid fa-star"></i></div></div>
+        <div class="stat-card"><div><div class="stat-label">Deals Closed This Month</div><div class="stat-value" id="statDeals">—</div><div class="stat-change up" id="statDealsChange"></div></div><div class="stat-icon blue"><i class="fa-solid fa-handshake"></i></div></div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 340px;gap:24px">
+        <!-- Recent Leads -->
+        <div class="card">
+          <div class="card-header">
+            <div><div class="card-title">Recent Leads</div><div class="card-subtitle">Last 10 incoming leads</div></div>
+            <button class="btn btn-outline btn-sm" onclick="nav('leads.html')">View All</button>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Name</th><th>Platform</th><th>Status</th><th>Score</th><th>Time</th></tr></thead>
+              <tbody id="recentLeadsBody"><tr><td colspan="5" style="text-align:center;padding:30px;color:var(--text-secondary)"><div class="spinner"></div></td></tr></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Quick actions + Performance summary -->
+        <div>
+          <div class="card" style="margin-bottom:20px">
+            <div class="card-title" style="margin-bottom:16px">Quick Actions</div>
+            <div style="display:flex;flex-direction:column;gap:10px">
+              <button class="btn btn-primary" onclick="nav('listings.html')"><i class="fa-solid fa-plus"></i> Post New Listing</button>
+              <button class="btn btn-outline" onclick="nav('leads.html')"><i class="fa-solid fa-users"></i> View All Leads</button>
+              <button class="btn btn-outline" onclick="nav('performance.html')"><i class="fa-solid fa-file-chart-column"></i> Weekly Report</button>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <div><div class="card-title">Performance</div><div class="card-subtitle">This week</div></div>
+            </div>
+            <canvas id="perfChart" height="130"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- Recent Listings -->
+      <div class="card" style="margin-top:24px">
+        <div class="card-header">
+          <div><div class="card-title">Recent Listings</div><div class="card-subtitle">Latest properties</div></div>
+          <button class="btn btn-outline btn-sm" onclick="nav('listings.html')">View All</button>
+        </div>
+        <div class="listings-grid" id="recentListingsGrid">
+          <div style="color:var(--text-secondary);padding:20px"><div class="spinner"></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="toast-container"></div>
+
+<script src="../shared/api.js"></script>
+<script>
+  let refreshTimer;
+
+  function nav(page) { window.location.href = page; }
+
+  async function signOut() {
+    await window.electronAPI.storeDelete('auth_token');
+    await window.electronAPI.storeDelete('user_data');
+    window.location.href = 'login.html';
+  }
+
+  function greeting() {
+    const h = new Date().getHours();
+    if (h < 12) return 'Good morning';
+    if (h < 17) return 'Good afternoon';
+    return 'Good evening';
+  }
+
+  async function init() {
+    const user = await checkAuth();
+    if (!user) return;
+
+    const name = user.full_name || user.name || user.email || 'Agent';
+    document.getElementById('greetingText').textContent = `${greeting()}, ${name.split(' ')[0]}`;
+    document.getElementById('todayDate').textContent = new Date().toLocaleDateString('en-US', { weekday:'long', month:'long', day:'numeric' });
+    document.getElementById('sidebarName').textContent = name;
+    document.getElementById('userAvatarInitial').textContent = name[0].toUpperCase();
+
+    await loadDashboard();
+    refreshTimer = setInterval(loadDashboard, 30000);
+  }
+
+  async function loadDashboard() {
+    const [statsRes, leadsRes, listingsRes] = await Promise.all([
+      apiRequest('GET', '/dashboard/stats'),
+      apiRequest('GET', '/leads?limit=10&order=desc'),
+      apiRequest('GET', '/listings?limit=3&order=desc'),
+    ]);
+
+    const offline = !statsRes.ok && statsRes.status === 0;
+    document.getElementById('offlineBanner').style.display = offline ? 'flex' : 'none';
+
+    if (statsRes.ok) {
+      const s = statsRes.data;
+      document.getElementById('statListings').textContent  = s.active_listings ?? '—';
+      document.getElementById('statNewLeads').textContent  = s.new_leads       ?? '—';
+      document.getElementById('statQualified').textContent = s.qualified_leads ?? '—';
+      document.getElementById('statDeals').textContent     = s.deals_closed    ?? '—';
+    }
+
+    renderRecentLeads(leadsRes.ok ? (leadsRes.data.items || leadsRes.data) : []);
+    renderRecentListings(listingsRes.ok ? (listingsRes.data.items || listingsRes.data) : []);
+    drawPerfChart();
+  }
+
+  function renderRecentLeads(leads) {
+    const tbody = document.getElementById('recentLeadsBody');
+    if (!leads || !leads.length) {
+      tbody.innerHTML = '<tr><td colspan="5"><div class="empty-state"><i class="fa-solid fa-users"></i><h3>No leads yet</h3><p>Leads will appear here once agents start receiving inquiries.</p></div></td></tr>';
+      return;
+    }
+    tbody.innerHTML = leads.map(l => `
+      <tr>
+        <td><div style="display:flex;align-items:center;gap:9px">
+          <div class="avatar" style="width:28px;height:28px;font-size:11px">${(l.full_name||'?')[0]}</div>
+          <span style="font-weight:500">${l.full_name || '—'}</span>
+        </div></td>
+        <td><span style="color:var(--text-secondary);font-size:12px"><i class="fa-brands fa-${platformIcon(l.platform)}" style="margin-right:5px"></i>${l.platform||'—'}</span></td>
+        <td>${getStatusBadge(l.status)}</td>
+        <td>
+          <div class="score-bar">
+            <div class="score-track"><div class="score-fill" style="width:${l.score||0}%;background:${getScoreColor(l.score||0)}"></div></div>
+            <span style="font-size:12px;color:var(--text-secondary)">${l.score||0}</span>
+          </div>
+        </td>
+        <td style="color:var(--text-secondary);font-size:12px">${formatRelative(l.created_at)}</td>
+      </tr>`).join('');
+  }
+
+  function renderRecentListings(listings) {
+    const grid = document.getElementById('recentListingsGrid');
+    if (!listings || !listings.length) {
+      grid.innerHTML = '<div class="empty-state"><i class="fa-solid fa-building"></i><h3>No listings yet</h3></div>';
+      return;
+    }
+    grid.innerHTML = listings.map(l => `
+      <div class="listing-card">
+        <div class="listing-img"><i class="fa-solid fa-house"></i>
+          <span class="listing-status-badge">${getStatusBadge(l.status)}</span>
+        </div>
+        <div class="listing-body">
+          <div class="listing-title">${l.title||'Untitled'}</div>
+          <div class="listing-price">${formatCurrency(l.price||0)}</div>
+          <div class="listing-meta">
+            <span><i class="fa-solid fa-location-dot"></i> ${l.location||'—'}</span>
+            <span><i class="fa-solid fa-bed"></i> ${l.bedrooms||0} bd</span>
+            <span><i class="fa-solid fa-bath"></i> ${l.bathrooms||0} ba</span>
+          </div>
+        </div>
+      </div>`).join('');
+  }
+
+  function platformIcon(p) {
+    const m = { facebook:'facebook', instagram:'instagram', tiktok:'tiktok', whatsapp:'whatsapp', twitter:'twitter', x:'x-twitter' };
+    return m[(p||'').toLowerCase()] || 'globe';
+  }
+
+  function drawPerfChart() {
+    const canvas = document.getElementById('perfChart');
+    const ctx = canvas.getContext('2d');
+    canvas.width = canvas.parentElement.clientWidth - 48;
+    canvas.height = 130;
+    const data = [4,7,5,9,6,11,8];
+    const labels = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+    const W = canvas.width, H = canvas.height;
+    const max = Math.max(...data) + 2;
+    const pad = { t:10, b:24, l:10, r:10 };
+    const aw = W - pad.l - pad.r, ah = H - pad.t - pad.b;
+    ctx.clearRect(0, 0, W, H);
+
+    // Grid lines
+    ctx.strokeStyle = 'rgba(45,55,72,0.5)'; ctx.lineWidth = 1;
+    for (let i = 0; i <= 3; i++) {
+      const y = pad.t + (ah / 3) * i;
+      ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(W - pad.r, y); ctx.stroke();
+    }
+
+    // Gradient fill
+    const pts = data.map((v, i) => [pad.l + (aw / (data.length-1)) * i, pad.t + ah - (v / max) * ah]);
+    const grad = ctx.createLinearGradient(0, pad.t, 0, H);
+    grad.addColorStop(0, 'rgba(124,58,237,0.3)'); grad.addColorStop(1, 'rgba(124,58,237,0)');
+    ctx.beginPath(); ctx.moveTo(pts[0][0], H - pad.b);
+    pts.forEach(([x,y]) => ctx.lineTo(x, y));
+    ctx.lineTo(pts[pts.length-1][0], H - pad.b); ctx.closePath();
+    ctx.fillStyle = grad; ctx.fill();
+
+    // Line
+    ctx.beginPath(); ctx.strokeStyle = '#7c3aed'; ctx.lineWidth = 2.5; ctx.lineJoin = 'round';
+    pts.forEach(([x,y], i) => i === 0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y));
+    ctx.stroke();
+
+    // Dots
+    pts.forEach(([x,y]) => { ctx.beginPath(); ctx.arc(x,y,4,0,Math.PI*2); ctx.fillStyle='#7c3aed'; ctx.fill(); ctx.strokeStyle='#0f0f1a'; ctx.lineWidth=2; ctx.stroke(); });
+
+    // Labels
+    ctx.fillStyle = '#94a3b8'; ctx.font = '11px Inter'; ctx.textAlign = 'center';
+    labels.forEach((l,i) => ctx.fillText(l, pts[i][0], H - 4));
+  }
+
+  init();
+</script>
+</body>
+</html>
