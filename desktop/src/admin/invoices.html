@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RealEstate Bot — Invoices</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../shared/styles.css" />
+  <style>
+    .sidebar-logo .logo-icon { background: linear-gradient(135deg, #ef4444, #b91c1c); }
+    .nav-item.active { color: #f87171; border-left-color: #ef4444; background: rgba(239,68,68,0.12); }
+    .btn-primary { background: #ef4444; } .btn-primary:hover { background: #f87171; }
+  </style>
+</head>
+<body>
+<div class="app-layout">
+
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-icon"><i class="fa-solid fa-shield-halved"></i></div>
+      <div><div class="logo-text">RealEstate Bot</div><div class="logo-sub">Admin Portal</div></div>
+    </div>
+    <nav class="sidebar-nav">
+      <span class="nav-section-label">Management</span>
+      <button class="nav-item" onclick="nav('dashboard.html')"><i class="fa-solid fa-gauge-high"></i> Dashboard</button>
+      <button class="nav-item" onclick="nav('clients.html')"><i class="fa-solid fa-users"></i> Clients</button>
+      <button class="nav-item active" onclick="nav('invoices.html')"><i class="fa-solid fa-file-invoice-dollar"></i> Invoices</button>
+      <span class="nav-section-label">Account</span>
+      <button class="nav-item danger" onclick="signOut()"><i class="fa-solid fa-right-from-bracket"></i> Sign Out</button>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="user-info">
+        <div class="user-avatar" style="background:linear-gradient(135deg,#ef4444,#b91c1c)" id="userAvatarInitial">A</div>
+        <div><div class="user-name" id="sidebarName">Admin</div><div class="user-role">System Administrator</div></div>
+      </div>
+    </div>
+  </aside>
+
+  <div class="main-content">
+    <header class="top-header">
+      <div class="header-title"><h1>Invoices</h1><p>Manage client billing</p></div>
+      <div class="header-actions">
+        <button class="btn btn-primary" onclick="openModal('invoiceModal')"><i class="fa-solid fa-plus"></i> Create Invoice</button>
+      </div>
+    </header>
+
+    <div class="page-body">
+      <!-- Summary cards -->
+      <div class="stats-grid" style="grid-template-columns:repeat(3,1fr);margin-bottom:24px">
+        <div class="stat-card"><div><div class="stat-label">Total Invoiced</div><div class="stat-value" id="totalInvoiced">—</div></div><div class="stat-icon blue"><i class="fa-solid fa-file-invoice-dollar"></i></div></div>
+        <div class="stat-card"><div><div class="stat-label">Collected</div><div class="stat-value" id="totalPaid">—</div></div><div class="stat-icon green"><i class="fa-solid fa-circle-check"></i></div></div>
+        <div class="stat-card"><div><div class="stat-label">Outstanding</div><div class="stat-value" id="totalOutstanding">—</div></div><div class="stat-icon red"><i class="fa-solid fa-clock"></i></div></div>
+      </div>
+
+      <div class="toolbar">
+        <div class="search-box">
+          <i class="fa-solid fa-magnifying-glass"></i>
+          <input type="text" id="searchInput" placeholder="Search by client name…" oninput="onSearch()" />
+        </div>
+        <button class="filter-btn active" onclick="setFilter('all',this)">All</button>
+        <button class="filter-btn" onclick="setFilter('pending',this)">Pending</button>
+        <button class="filter-btn" onclick="setFilter('paid',this)">Paid</button>
+        <button class="filter-btn" onclick="setFilter('overdue',this)">Overdue</button>
+      </div>
+
+      <div class="card" style="padding:0;overflow:hidden">
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Client</th><th>Amount</th><th>Status</th><th>Due Date</th><th>Paid Date</th><th>Actions</th></tr>
+            </thead>
+            <tbody id="invoicesBody">
+              <tr><td colspan="6" style="text-align:center;padding:40px"><div class="spinner"></div></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="pagination" id="pagination" style="padding:16px"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Create Invoice Modal -->
+<div class="modal-overlay" id="invoiceModal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">Create Invoice</span>
+      <button class="modal-close" onclick="closeModal('invoiceModal')"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <form onsubmit="submitInvoice(event)">
+      <div class="form-group">
+        <label class="form-label">Client</label>
+        <select class="form-select" id="ifClient" required>
+          <option value="">— Select client —</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Amount ($)</label>
+        <input type="number" class="form-input" id="ifAmount" placeholder="299.00" step="0.01" min="0" required />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Description</label>
+        <textarea class="form-textarea" id="ifDesc" placeholder="Monthly subscription — Pro Plan"></textarea>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Due Date</label>
+        <input type="date" class="form-input" id="ifDue" required />
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline" onclick="closeModal('invoiceModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary" id="invoiceSubmitBtn"><i class="fa-solid fa-paper-plane"></i> Create</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div id="toast-container"></div>
+<script src="../shared/api.js"></script>
+<script src="admin.js"></script>
+<script>
+  let currentPage = 1, totalPages = 1, currentFilter = 'all', searchQuery = '';
+  const PER_PAGE = 15;
+
+  function nav(p) { window.location.href = p; }
+  async function signOut() { await window.electronAPI.storeDelete('admin_token'); window.location.href = 'login.html'; }
+
+  async function init() {
+    const user = await checkAdminAuth();
+    if (!user) return;
+    const name = user.full_name || user.email || 'Admin';
+    document.getElementById('sidebarName').textContent = name;
+    document.getElementById('userAvatarInitial').textContent = name[0].toUpperCase();
+
+    // Pre-fill client from query string if coming from clients page
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('client_id')) {
+      await loadClientSelect();
+      document.getElementById('ifClient').value = params.get('client_id');
+      openModal('invoiceModal');
+    } else {
+      loadClientSelect();
+    }
+
+    // Set default due date to 30 days from now
+    const due = new Date(); due.setDate(due.getDate() + 30);
+    document.getElementById('ifDue').value = due.toISOString().split('T')[0];
+
+    await loadInvoices();
+    await loadSummary();
+  }
+
+  async function loadClientSelect() {
+    const res = await adminRequest('GET', '/admin/clients?limit=200');
+    const clients = res.ok ? (res.data.items || res.data) : [];
+    const sel = document.getElementById('ifClient');
+    sel.innerHTML = '<option value="">— Select client —</option>' +
+      clients.map(c => `<option value="${c.id}">${c.full_name} (${c.email})</option>`).join('');
+  }
+
+  async function loadSummary() {
+    const res = await adminRequest('GET', '/admin/invoices/summary');
+    if (res.ok) {
+      document.getElementById('totalInvoiced').textContent    = formatCurrency(res.data.total_invoiced || 0);
+      document.getElementById('totalPaid').textContent        = formatCurrency(res.data.total_paid     || 0);
+      document.getElementById('totalOutstanding').textContent = formatCurrency(res.data.outstanding    || 0);
+    }
+  }
+
+  let searchTimer;
+  function onSearch() {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(() => { searchQuery = document.getElementById('searchInput').value; currentPage = 1; loadInvoices(); }, 300);
+  }
+
+  function setFilter(f, el) {
+    currentFilter = f; currentPage = 1;
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    el.classList.add('active');
+    loadInvoices();
+  }
+
+  async function loadInvoices() {
+    const params = new URLSearchParams({ page: currentPage, limit: PER_PAGE });
+    if (currentFilter !== 'all') params.set('status', currentFilter);
+    if (searchQuery) params.set('search', searchQuery);
+    const res = await adminRequest('GET', `/admin/invoices?${params}`);
+    const items = res.ok ? (res.data.items || res.data) : [];
+    const total = res.ok ? (res.data.total || items.length) : 0;
+    totalPages = Math.max(1, Math.ceil(total / PER_PAGE));
+    renderInvoices(items);
+    renderPagination();
+  }
+
+  function renderInvoices(invoices) {
+    const tbody = document.getElementById('invoicesBody');
+    if (!invoices.length) {
+      tbody.innerHTML = `<tr><td colspan="6"><div class="empty-state"><i class="fa-solid fa-file-invoice"></i><h3>No invoices found</h3><p>Create your first invoice using the button above.</p></div></td></tr>`;
+      return;
+    }
+    tbody.innerHTML = invoices.map(inv => `
+      <tr>
+        <td><div style="font-weight:600">${inv.client_name||'—'}</div><div style="font-size:11px;color:var(--text-secondary)">${inv.client_email||''}</div></td>
+        <td style="font-weight:700;font-size:15px">${formatCurrency(inv.amount||0)}</td>
+        <td>${getStatusBadge(inv.status||'pending')}</td>
+        <td style="font-size:12.5px;color:${isOverdue(inv)?'var(--danger)':'var(--text-secondary)'}">${formatDate(inv.due_date)}</td>
+        <td style="font-size:12.5px;color:var(--text-secondary)">${inv.paid_at ? formatDate(inv.paid_at) : '—'}</td>
+        <td>
+          <div style="display:flex;gap:6px">
+            ${inv.status !== 'paid' ? `<button class="btn btn-outline btn-sm" onclick="markPaid('${inv.id}')" title="Mark Paid"><i class="fa-solid fa-check" style="color:var(--success)"></i></button>` : ''}
+            <button class="btn btn-danger btn-sm" onclick="deleteInvoice('${inv.id}')" title="Delete"><i class="fa-solid fa-trash"></i></button>
+          </div>
+        </td>
+      </tr>`).join('');
+  }
+
+  function isOverdue(inv) {
+    return inv.status !== 'paid' && inv.due_date && new Date(inv.due_date) < new Date();
+  }
+
+  function renderPagination() {
+    const pag = document.getElementById('pagination');
+    if (totalPages <= 1) { pag.innerHTML = ''; return; }
+    let html = `<button class="page-btn" onclick="goPage(${currentPage-1})" ${currentPage===1?'disabled':''}><i class="fa-solid fa-chevron-left"></i></button>`;
+    for (let i = 1; i <= totalPages; i++) html += `<button class="page-btn ${i===currentPage?'active':''}" onclick="goPage(${i})">${i}</button>`;
+    html += `<button class="page-btn" onclick="goPage(${currentPage+1})" ${currentPage===totalPages?'disabled':''}><i class="fa-solid fa-chevron-right"></i></button>`;
+    pag.innerHTML = html;
+  }
+
+  function goPage(p) { if (p < 1 || p > totalPages) return; currentPage = p; loadInvoices(); }
+
+  async function submitInvoice(e) {
+    e.preventDefault();
+    const btn = document.getElementById('invoiceSubmitBtn');
+    btn.disabled = true;
+    const body = {
+      client_id:   document.getElementById('ifClient').value,
+      amount:      parseFloat(document.getElementById('ifAmount').value),
+      description: document.getElementById('ifDesc').value,
+      due_date:    document.getElementById('ifDue').value,
+    };
+    const res = await adminRequest('POST', '/admin/invoices', body);
+    btn.disabled = false;
+    if (res.ok) {
+      showToast('success', 'Invoice created');
+      closeModal('invoiceModal');
+      loadInvoices(); loadSummary();
+    } else {
+      showToast('error', 'Error', res.data?.detail || 'Failed to create invoice.');
+    }
+  }
+
+  async function markPaid(id) {
+    const res = await adminRequest('PATCH', `/admin/invoices/${id}`, { status: 'paid', paid_at: new Date().toISOString() });
+    if (res.ok) { showToast('success', 'Invoice marked as paid'); loadInvoices(); loadSummary(); }
+    else showToast('error', 'Error', 'Failed to update invoice.');
+  }
+
+  async function deleteInvoice(id) {
+    const res = await adminRequest('DELETE', `/admin/invoices/${id}`);
+    if (res.ok) { showToast('success', 'Invoice deleted'); loadInvoices(); loadSummary(); }
+    else showToast('error', 'Error', 'Failed to delete invoice.');
+  }
+
+  init();
+</script>
+</body>
+</html>

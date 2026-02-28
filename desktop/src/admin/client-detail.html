@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RealEstate Bot — Client Detail</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../shared/styles.css" />
+  <style>
+    .sidebar-logo .logo-icon { background: linear-gradient(135deg, #ef4444, #b91c1c); }
+    .nav-item.active { color: #f87171; border-left-color: #ef4444; background: rgba(239,68,68,0.12); }
+    .btn-primary { background: #ef4444; } .btn-primary:hover { background: #f87171; }
+    .tab.active { color: #f87171; border-bottom-color: #ef4444; }
+    .tab-panel { display: none; } .tab-panel.active { display: block; }
+  </style>
+</head>
+<body>
+<div class="app-layout">
+
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-icon"><i class="fa-solid fa-shield-halved"></i></div>
+      <div><div class="logo-text">RealEstate Bot</div><div class="logo-sub">Admin Portal</div></div>
+    </div>
+    <nav class="sidebar-nav">
+      <span class="nav-section-label">Management</span>
+      <button class="nav-item" onclick="nav('dashboard.html')"><i class="fa-solid fa-gauge-high"></i> Dashboard</button>
+      <button class="nav-item active" onclick="nav('clients.html')"><i class="fa-solid fa-users"></i> Clients</button>
+      <button class="nav-item" onclick="nav('invoices.html')"><i class="fa-solid fa-file-invoice-dollar"></i> Invoices</button>
+      <span class="nav-section-label">Account</span>
+      <button class="nav-item danger" onclick="signOut()"><i class="fa-solid fa-right-from-bracket"></i> Sign Out</button>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="user-info">
+        <div class="user-avatar" style="background:linear-gradient(135deg,#ef4444,#b91c1c)" id="userAvatarInitial">A</div>
+        <div><div class="user-name" id="sidebarName">Admin</div><div class="user-role">System Administrator</div></div>
+      </div>
+    </div>
+  </aside>
+
+  <div class="main-content">
+    <header class="top-header">
+      <div class="header-title">
+        <div style="display:flex;align-items:center;gap:12px">
+          <button class="btn btn-outline btn-sm" onclick="nav('clients.html')"><i class="fa-solid fa-arrow-left"></i></button>
+          <div><h1 id="clientNameHeader">Client Details</h1><p id="clientEmailHeader">—</p></div>
+        </div>
+      </div>
+      <div class="header-actions">
+        <button class="btn btn-outline btn-sm" onclick="impersonate()" title="View as client"><i class="fa-solid fa-user-secret"></i> Impersonate</button>
+        <button class="btn btn-primary btn-sm" onclick="createInvoiceForClient()"><i class="fa-solid fa-file-invoice"></i> Create Invoice</button>
+      </div>
+    </header>
+
+    <div class="page-body" id="pageBody">
+      <div style="text-align:center;padding:60px"><div class="spinner"></div></div>
+    </div>
+  </div>
+</div>
+
+<div id="toast-container"></div>
+<script src="../shared/api.js"></script>
+<script src="admin.js"></script>
+<script>
+  let clientId, clientData;
+
+  function nav(p) { window.location.href = p; }
+  async function signOut() { await window.electronAPI.storeDelete('admin_token'); window.location.href = 'login.html'; }
+
+  async function init() {
+    const user = await checkAdminAuth();
+    if (!user) return;
+    const name = user.full_name || user.email || 'Admin';
+    document.getElementById('sidebarName').textContent = name;
+    document.getElementById('userAvatarInitial').textContent = name[0].toUpperCase();
+
+    const params = new URLSearchParams(window.location.search);
+    clientId = params.get('id');
+    if (!clientId) { nav('clients.html'); return; }
+
+    await loadClient();
+  }
+
+  async function loadClient() {
+    const res = await adminRequest('GET', `/admin/clients/${clientId}`);
+    if (!res.ok) { showToast('error', 'Error', 'Client not found.'); nav('clients.html'); return; }
+    clientData = res.data;
+
+    document.getElementById('clientNameHeader').textContent  = clientData.full_name || '—';
+    document.getElementById('clientEmailHeader').textContent = clientData.email     || '—';
+
+    renderPage();
+  }
+
+  function renderPage() {
+    const c = clientData;
+    document.getElementById('pageBody').innerHTML = `
+      <!-- Client info card -->
+      <div class="card" style="display:flex;align-items:center;gap:24px;margin-bottom:24px;flex-wrap:wrap">
+        <div class="avatar" style="width:64px;height:64px;font-size:24px;flex-shrink:0">${(c.full_name||'?')[0]}</div>
+        <div style="flex:1">
+          <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+            <div style="font-size:22px;font-weight:800">${c.full_name||'—'}</div>
+            <span class="badge badge-purple">${c.plan||'Basic'}</span>
+            ${getStatusBadge(c.status||'active')}
+          </div>
+          <div style="display:flex;gap:24px;margin-top:10px;flex-wrap:wrap;font-size:13px;color:var(--text-secondary)">
+            <span><i class="fa-solid fa-envelope" style="margin-right:6px"></i>${c.email||'—'}</span>
+            <span><i class="fa-solid fa-phone" style="margin-right:6px"></i>${c.phone||'—'}</span>
+            <span><i class="fa-solid fa-calendar" style="margin-right:6px"></i>Joined ${formatDate(c.created_at)}</span>
+            <span><i class="fa-solid fa-clock" style="margin-right:6px"></i>Last active ${formatRelative(c.last_active)}</span>
+          </div>
+        </div>
+        <div style="display:flex;gap:20px;text-align:center;flex-shrink:0">
+          ${miniStat(c.active_listings||0, 'Listings', 'fa-building')}
+          ${miniStat(c.total_leads||0, 'Leads', 'fa-users')}
+          ${miniStat(c.deals_closed||0, 'Deals', 'fa-handshake')}
+        </div>
+      </div>
+
+      <!-- Tabs -->
+      <div class="tabs">
+        <button class="tab active" onclick="switchTab('overview',this)">Overview</button>
+        <button class="tab" onclick="switchTab('leads',this)">Leads</button>
+        <button class="tab" onclick="switchTab('listings',this)">Listings</button>
+        <button class="tab" onclick="switchTab('performance',this)">Performance</button>
+        <button class="tab" onclick="switchTab('invoices',this)">Invoices</button>
+      </div>
+
+      <div id="tab-overview" class="tab-panel active"></div>
+      <div id="tab-leads" class="tab-panel"></div>
+      <div id="tab-listings" class="tab-panel"></div>
+      <div id="tab-performance" class="tab-panel"></div>
+      <div id="tab-invoices" class="tab-panel"></div>
+    `;
+
+    loadTabOverview();
+  }
+
+  function miniStat(value, label, icon) {
+    return `<div><div style="font-size:22px;font-weight:800">${value}</div><div style="font-size:11px;color:var(--text-secondary);margin-top:3px"><i class="fa-solid ${icon}" style="margin-right:4px"></i>${label}</div></div>`;
+  }
+
+  function switchTab(tab, el) {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    el.classList.add('active');
+    document.getElementById(`tab-${tab}`).classList.add('active');
+    const loaders = { overview: loadTabOverview, leads: loadTabLeads, listings: loadTabListings, performance: loadTabPerformance, invoices: loadTabInvoices };
+    loaders[tab]?.();
+  }
+
+  async function loadTabOverview() {
+    const c = clientData;
+    document.getElementById('tab-overview').innerHTML = `
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+        <div class="card">
+          <div class="card-title" style="margin-bottom:16px">Contact Information</div>
+          ${infoRow('fa-envelope','Email',c.email)}
+          ${infoRow('fa-phone','Phone',c.phone)}
+          ${infoRow('fa-brands fa-telegram','Telegram',c.telegram)}
+          ${infoRow('fa-star','Plan',c.plan)}
+          ${infoRow('fa-calendar-plus','Joined',formatDate(c.created_at))}
+        </div>
+        <div class="card">
+          <div class="card-title" style="margin-bottom:16px">Social Connections</div>
+          ${socialRow('Facebook','fa-brands fa-facebook','#1877f2', c.socials?.facebook)}
+          ${socialRow('Instagram','fa-brands fa-instagram','#e1306c', c.socials?.instagram)}
+          ${socialRow('TikTok','fa-brands fa-tiktok','#fff', c.socials?.tiktok)}
+        </div>
+      </div>`;
+  }
+
+  function infoRow(icon, label, value) {
+    return `<div style="display:flex;gap:10px;align-items:flex-start;margin-bottom:12px"><i class="fa-solid ${icon}" style="color:var(--text-secondary);width:16px;margin-top:2px;font-size:13px"></i><div><div style="color:var(--text-secondary);font-size:11px;font-weight:600;text-transform:uppercase">${label}</div><div style="margin-top:1px;font-size:13.5px">${value||'—'}</div></div></div>`;
+  }
+
+  function socialRow(name, icon, color, data) {
+    return `<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border)">
+      <div style="display:flex;align-items:center;gap:10px">
+        <i class="${icon}" style="color:${color};font-size:18px;width:20px;text-align:center"></i>
+        <span style="font-weight:500">${name}</span>
+      </div>
+      ${data?.connected ? `<span class="badge badge-green"><i class="fa-solid fa-circle-check"></i> Connected</span>` : `<span class="badge badge-gray">Not connected</span>`}
+    </div>`;
+  }
+
+  async function loadTabLeads() {
+    const el = document.getElementById('tab-leads');
+    el.innerHTML = '<div style="padding:20px"><div class="spinner"></div></div>';
+    const res = await adminRequest('GET', `/admin/clients/${clientId}/leads?limit=20`);
+    const items = res.ok ? (res.data.items || res.data) : [];
+    if (!items.length) { el.innerHTML = '<div class="empty-state"><i class="fa-solid fa-users"></i><h3>No leads</h3></div>'; return; }
+    el.innerHTML = `<div class="card" style="padding:0;overflow:hidden"><div class="table-wrap"><table>
+      <thead><tr><th>Name</th><th>Email</th><th>Platform</th><th>Score</th><th>Status</th><th>Created</th></tr></thead>
+      <tbody>${items.map(l => `<tr>
+        <td style="font-weight:600">${l.full_name||'—'}</td>
+        <td style="color:var(--text-secondary);font-size:12.5px">${l.email||'—'}</td>
+        <td style="font-size:12px;color:var(--text-secondary)">${l.platform||'—'}</td>
+        <td><span style="font-weight:600;color:${getScoreColor(l.score||0)}">${l.score||0}</span></td>
+        <td>${getStatusBadge(l.status)}</td>
+        <td style="font-size:12px;color:var(--text-secondary)">${formatDate(l.created_at)}</td>
+      </tr>`).join('')}</tbody>
+    </table></div></div>`;
+  }
+
+  async function loadTabListings() {
+    const el = document.getElementById('tab-listings');
+    el.innerHTML = '<div style="padding:20px"><div class="spinner"></div></div>';
+    const res = await adminRequest('GET', `/admin/clients/${clientId}/listings?limit=12`);
+    const items = res.ok ? (res.data.items || res.data) : [];
+    if (!items.length) { el.innerHTML = '<div class="empty-state"><i class="fa-solid fa-building"></i><h3>No listings</h3></div>'; return; }
+    el.innerHTML = `<div class="listings-grid">${items.map(l => `
+      <div class="listing-card">
+        <div class="listing-img"><i class="fa-solid fa-house"></i>
+          <span class="listing-status-badge">${getStatusBadge(l.status)}</span>
+        </div>
+        <div class="listing-body">
+          <div class="listing-title">${l.title||'Untitled'}</div>
+          <div class="listing-price">${formatCurrency(l.price||0)}</div>
+          <div class="listing-meta"><span><i class="fa-solid fa-location-dot"></i> ${l.location||'—'}</span></div>
+        </div>
+      </div>`).join('')}</div>`;
+  }
+
+  async function loadTabPerformance() {
+    const el = document.getElementById('tab-performance');
+    el.innerHTML = '<div style="padding:20px"><div class="spinner"></div></div>';
+    const res = await adminRequest('GET', `/admin/clients/${clientId}/performance`);
+    const d = res.ok ? res.data : {};
+    el.innerHTML = `
+      <div class="stats-grid">
+        <div class="stat-card"><div><div class="stat-label">Total Leads</div><div class="stat-value">${d.total_leads??'—'}</div></div><div class="stat-icon purple"><i class="fa-solid fa-users"></i></div></div>
+        <div class="stat-card"><div><div class="stat-label">Qualified Rate</div><div class="stat-value">${d.qualified_rate!=null?d.qualified_rate+'%':'—'}</div></div><div class="stat-icon green"><i class="fa-solid fa-percent"></i></div></div>
+        <div class="stat-card"><div><div class="stat-label">Deals Closed</div><div class="stat-value">${d.deals_closed??'—'}</div></div><div class="stat-icon gold"><i class="fa-solid fa-handshake"></i></div></div>
+        <div class="stat-card"><div><div class="stat-label">Performance Score</div><div class="stat-value" style="color:${getScoreColor(d.performance_score||0)}">${d.performance_score??'—'}</div></div><div class="stat-icon blue"><i class="fa-solid fa-star"></i></div></div>
+      </div>`;
+  }
+
+  async function loadTabInvoices() {
+    const el = document.getElementById('tab-invoices');
+    el.innerHTML = '<div style="padding:20px"><div class="spinner"></div></div>';
+    const res = await adminRequest('GET', `/admin/clients/${clientId}/invoices`);
+    const items = res.ok ? (res.data.items || res.data) : [];
+    if (!items.length) { el.innerHTML = '<div class="empty-state"><i class="fa-solid fa-file-invoice"></i><h3>No invoices</h3></div>'; return; }
+    el.innerHTML = `<div class="card" style="padding:0;overflow:hidden"><div class="table-wrap"><table>
+      <thead><tr><th>Amount</th><th>Status</th><th>Due Date</th><th>Paid Date</th><th>Actions</th></tr></thead>
+      <tbody>${items.map(inv => `<tr>
+        <td style="font-weight:700">${formatCurrency(inv.amount||0)}</td>
+        <td>${getStatusBadge(inv.status)}</td>
+        <td style="font-size:12.5px;color:var(--text-secondary)">${formatDate(inv.due_date)}</td>
+        <td style="font-size:12.5px;color:var(--text-secondary)">${inv.paid_at?formatDate(inv.paid_at):'—'}</td>
+        <td>${inv.status!=='paid'?`<button class="btn btn-outline btn-sm" onclick="markInvPaid('${inv.id}')"><i class="fa-solid fa-check" style="color:var(--success)"></i> Mark Paid</button>`:'<span class="badge badge-green">Paid</span>'}</td>
+      </tr>`).join('')}</tbody>
+    </table></div></div>`;
+  }
+
+  async function markInvPaid(id) {
+    const res = await adminRequest('PATCH', `/admin/invoices/${id}`, { status:'paid', paid_at: new Date().toISOString() });
+    if (res.ok) { showToast('success', 'Marked as paid'); loadTabInvoices(); }
+    else showToast('error', 'Error', 'Failed to update invoice.');
+  }
+
+  function createInvoiceForClient() {
+    window.location.href = `invoices.html?client_id=${clientId}&client_name=${encodeURIComponent(clientData?.full_name||'')}`;
+  }
+
+  async function impersonate() {
+    showToast('info', 'Impersonation', 'Opening client view…');
+    const res = await adminRequest('POST', `/admin/clients/${clientId}/impersonate`);
+    if (res.ok && res.data.access_token) {
+      await window.electronAPI.storeSet('auth_token', res.data.access_token);
+      await window.electronAPI.openClientPortal();
+    } else {
+      showToast('error', 'Error', 'Impersonation not available.');
+    }
+  }
+
+  init();
+</script>
+</body>
+</html>

@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RealEstate Bot — Performance</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../shared/styles.css" />
+</head>
+<body>
+<div class="app-layout">
+
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-icon"><i class="fa-solid fa-house-chimney"></i></div>
+      <div><div class="logo-text">RealEstate Bot</div><div class="logo-sub">Client Portal</div></div>
+    </div>
+    <nav class="sidebar-nav">
+      <span class="nav-section-label">Main</span>
+      <button class="nav-item" onclick="nav('dashboard.html')"><i class="fa-solid fa-gauge-high"></i> Dashboard</button>
+      <button class="nav-item" onclick="nav('listings.html')"><i class="fa-solid fa-building"></i> Listings</button>
+      <button class="nav-item" onclick="nav('leads.html')"><i class="fa-solid fa-users"></i> Leads</button>
+      <button class="nav-item active" onclick="nav('performance.html')"><i class="fa-solid fa-chart-line"></i> Performance</button>
+      <span class="nav-section-label">Account</span>
+      <button class="nav-item" onclick="nav('settings.html')"><i class="fa-solid fa-gear"></i> Settings</button>
+      <button class="nav-item danger" onclick="signOut()"><i class="fa-solid fa-right-from-bracket"></i> Sign Out</button>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="user-info">
+        <div class="user-avatar" id="userAvatarInitial">A</div>
+        <div><div class="user-name" id="sidebarName">Agent</div><div class="user-role">Real Estate Agent</div></div>
+      </div>
+    </div>
+  </aside>
+
+  <div class="main-content">
+    <header class="top-header">
+      <div class="header-title"><h1>Performance</h1><p>Your metrics and analytics</p></div>
+      <div class="header-actions">
+        <select class="form-select" id="rangeSelect" onchange="loadPerformance()" style="width:170px;padding:8px 12px">
+          <option value="7">Last 7 Days</option>
+          <option value="30" selected>Last 30 Days</option>
+          <option value="90">Last 90 Days</option>
+        </select>
+      </div>
+    </header>
+
+    <div class="page-body">
+      <!-- KPI Cards -->
+      <div class="stats-grid" id="kpiGrid">
+        <div class="stat-card"><div><div class="stat-label">Total Leads</div><div class="stat-value" id="kpiLeads">—</div></div><div class="stat-icon purple"><i class="fa-solid fa-users"></i></div></div>
+        <div class="stat-card"><div><div class="stat-label">Qualified Rate</div><div class="stat-value" id="kpiRate">—</div></div><div class="stat-icon green"><i class="fa-solid fa-percent"></i></div></div>
+        <div class="stat-card"><div><div class="stat-label">Deals Closed</div><div class="stat-value" id="kpiDeals">—</div></div><div class="stat-icon gold"><i class="fa-solid fa-handshake"></i></div></div>
+        <div class="stat-card"><div><div class="stat-label">Avg Response Time</div><div class="stat-value" id="kpiResponse">—</div></div><div class="stat-icon blue"><i class="fa-solid fa-clock"></i></div></div>
+      </div>
+
+      <!-- Performance Score -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-bottom:24px">
+        <div class="card">
+          <div class="card-header"><div class="card-title">Leads Over Time</div></div>
+          <canvas id="leadsChart" height="200"></canvas>
+        </div>
+        <div class="card">
+          <div class="card-header"><div class="card-title">Response Time Trend</div></div>
+          <canvas id="responseChart" height="200"></canvas>
+        </div>
+      </div>
+
+      <!-- Followers & Score -->
+      <div style="display:grid;grid-template-columns:1fr 320px;gap:24px;margin-bottom:24px">
+        <div class="card">
+          <div class="card-title" style="margin-bottom:20px">Followers by Platform</div>
+          <div id="followersGrid" style="display:flex;flex-direction:column;gap:14px">
+            <div style="color:var(--text-secondary)"><div class="spinner"></div></div>
+          </div>
+        </div>
+        <div class="card" style="text-align:center">
+          <div class="card-title" style="margin-bottom:20px">Performance Score</div>
+          <canvas id="scoreGauge" width="200" height="130" style="margin:0 auto;display:block"></canvas>
+          <div id="scoreValue" style="font-size:42px;font-weight:800;margin:10px 0 4px">—</div>
+          <div id="scoreLabel" style="font-size:13px;color:var(--text-secondary)">Overall Rating</div>
+        </div>
+      </div>
+
+      <!-- Weekly Reports -->
+      <div class="card">
+        <div class="card-header">
+          <div><div class="card-title">Weekly Reports</div><div class="card-subtitle">Download past performance reports</div></div>
+        </div>
+        <div id="reportsList">
+          <div style="color:var(--text-secondary);padding:20px"><div class="spinner"></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="toast-container"></div>
+<script src="../shared/api.js"></script>
+<script>
+  function nav(p) { window.location.href = p; }
+  async function signOut() { await window.electronAPI.storeDelete('auth_token'); window.location.href = 'login.html'; }
+
+  async function init() {
+    const user = await checkAuth();
+    if (!user) return;
+    const name = user.full_name || user.email || 'Agent';
+    document.getElementById('sidebarName').textContent = name;
+    document.getElementById('userAvatarInitial').textContent = name[0].toUpperCase();
+    await loadPerformance();
+  }
+
+  async function loadPerformance() {
+    const days = document.getElementById('rangeSelect').value;
+    const res = await apiRequest('GET', `/performance?days=${days}`);
+    const d = res.ok ? res.data : {};
+
+    document.getElementById('kpiLeads').textContent    = d.total_leads    ?? '—';
+    document.getElementById('kpiRate').textContent     = d.qualified_rate  != null ? d.qualified_rate + '%' : '—';
+    document.getElementById('kpiDeals').textContent    = d.deals_closed   ?? '—';
+    document.getElementById('kpiResponse').textContent = d.avg_response_time != null ? d.avg_response_time + 'h' : '—';
+
+    drawLeadsChart(d.leads_over_time || generateMockTimeSeries(parseInt(days)));
+    drawResponseChart(d.response_trend || generateMockTimeSeries(parseInt(days), 2, 6));
+    renderFollowers(d.followers || []);
+    drawScoreGauge(d.performance_score || 0);
+    renderReports(d.reports || []);
+  }
+
+  function generateMockTimeSeries(days, min = 2, max = 15) {
+    return Array.from({ length: Math.min(days, 14) }, () => Math.floor(Math.random() * (max - min + 1)) + min);
+  }
+
+  function drawLeadsChart(data) {
+    const canvas = document.getElementById('leadsChart');
+    drawLineChart(canvas, data, '#7c3aed', 'rgba(124,58,237,0.2)');
+  }
+
+  function drawResponseChart(data) {
+    const canvas = document.getElementById('responseChart');
+    drawLineChart(canvas, data, '#f59e0b', 'rgba(245,158,11,0.2)');
+  }
+
+  function drawLineChart(canvas, data, strokeColor, fillColor) {
+    canvas.width = canvas.parentElement.clientWidth - 48;
+    const ctx = canvas.getContext('2d');
+    const W = canvas.width, H = canvas.height;
+    const pad = { t:10, b:20, l:10, r:10 };
+    const max = Math.max(...data, 1) + 2;
+    const aw = W - pad.l - pad.r, ah = H - pad.t - pad.b;
+    ctx.clearRect(0, 0, W, H);
+
+    // Grid
+    ctx.strokeStyle = 'rgba(45,55,72,0.4)'; ctx.lineWidth = 1;
+    for (let i = 0; i <= 3; i++) { const y = pad.t + (ah/3)*i; ctx.beginPath(); ctx.moveTo(pad.l,y); ctx.lineTo(W-pad.r,y); ctx.stroke(); }
+
+    const pts = data.map((v,i) => [pad.l + (aw/(data.length-1||1))*i, pad.t + ah - (v/max)*ah]);
+
+    // Fill
+    const grad = ctx.createLinearGradient(0,pad.t,0,H);
+    grad.addColorStop(0, fillColor); grad.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.beginPath(); ctx.moveTo(pts[0][0], H-pad.b);
+    pts.forEach(([x,y]) => ctx.lineTo(x,y));
+    ctx.lineTo(pts[pts.length-1][0], H-pad.b); ctx.closePath();
+    ctx.fillStyle = grad; ctx.fill();
+
+    // Line
+    ctx.beginPath(); ctx.strokeStyle = strokeColor; ctx.lineWidth = 2.5; ctx.lineJoin='round';
+    pts.forEach(([x,y],i) => i===0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y)); ctx.stroke();
+
+    // Dots
+    pts.forEach(([x,y]) => { ctx.beginPath(); ctx.arc(x,y,3.5,0,Math.PI*2); ctx.fillStyle=strokeColor; ctx.fill(); });
+  }
+
+  function drawScoreGauge(score) {
+    const canvas = document.getElementById('scoreGauge');
+    const ctx = canvas.getContext('2d');
+    const W = canvas.width, H = canvas.height;
+    ctx.clearRect(0,0,W,H);
+    const cx = W/2, cy = H - 20, r = 80;
+    const startAngle = Math.PI, endAngle = Math.PI * 2;
+
+    // Track
+    ctx.beginPath(); ctx.arc(cx,cy,r,startAngle,endAngle); ctx.strokeStyle='rgba(45,55,72,0.8)'; ctx.lineWidth=14; ctx.lineCap='round'; ctx.stroke();
+
+    // Fill
+    const fillEnd = startAngle + (score/100) * Math.PI;
+    const color = score >= 70 ? '#10b981' : score >= 40 ? '#f59e0b' : '#ef4444';
+    ctx.beginPath(); ctx.arc(cx,cy,r,startAngle,fillEnd); ctx.strokeStyle=color; ctx.lineWidth=14; ctx.stroke();
+
+    document.getElementById('scoreValue').textContent = score;
+    document.getElementById('scoreValue').style.color = color;
+    document.getElementById('scoreLabel').textContent = score >= 70 ? 'Excellent' : score >= 40 ? 'Good' : 'Needs Improvement';
+  }
+
+  function renderFollowers(platforms) {
+    const grid = document.getElementById('followersGrid');
+    if (!platforms.length) {
+      const defaults = [
+        { platform:'Facebook', icon:'fa-brands fa-facebook', color:'#1877f2', followers:0, trend:0 },
+        { platform:'Instagram', icon:'fa-brands fa-instagram', color:'#e1306c', followers:0, trend:0 },
+        { platform:'TikTok', icon:'fa-brands fa-tiktok', color:'#fff', followers:0, trend:0 },
+      ];
+      platforms = defaults;
+    }
+    grid.innerHTML = platforms.map(p => `
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:var(--bg-secondary);border-radius:10px">
+        <div style="display:flex;align-items:center;gap:12px">
+          <div style="width:38px;height:38px;border-radius:9px;background:rgba(255,255,255,0.05);display:flex;align-items:center;justify-content:center;font-size:18px;color:${p.color||'#fff'}"><i class="${p.icon||'fa-solid fa-globe'}"></i></div>
+          <div><div style="font-weight:600">${p.platform}</div><div style="font-size:12px;color:var(--text-secondary)">followers</div></div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:18px;font-weight:700">${(p.followers||0).toLocaleString()}</div>
+          <div style="font-size:12px;color:${(p.trend||0)>=0?'var(--success)':'var(--danger)'}">${(p.trend||0)>=0?'▲':'▼'} ${Math.abs(p.trend||0)}%</div>
+        </div>
+      </div>`).join('');
+  }
+
+  function renderReports(reports) {
+    const el = document.getElementById('reportsList');
+    if (!reports.length) {
+      el.innerHTML = '<div class="empty-state"><i class="fa-solid fa-file-chart-column"></i><h3>No reports yet</h3><p>Weekly reports will appear here once generated.</p></div>';
+      return;
+    }
+    el.innerHTML = `<div class="table-wrap"><table>
+      <thead><tr><th>Period</th><th>Generated</th><th>Leads</th><th>Deals</th><th>Score</th><th>Action</th></tr></thead>
+      <tbody>${reports.map(r => `
+        <tr>
+          <td style="font-weight:600">${r.period||'—'}</td>
+          <td style="color:var(--text-secondary);font-size:12.5px">${formatDate(r.generated_at)}</td>
+          <td>${r.total_leads||0}</td>
+          <td>${r.deals_closed||0}</td>
+          <td><span style="color:${getScoreColor(r.score||0)};font-weight:600">${r.score||0}</span></td>
+          <td><button class="btn btn-outline btn-sm" onclick="downloadReport('${r.id}')"><i class="fa-solid fa-download"></i> Download</button></td>
+        </tr>`).join('')}
+      </tbody></table></div>`;
+  }
+
+  async function downloadReport(id) {
+    showToast('info', 'Downloading…', 'Your report is being prepared.');
+    const res = await apiRequest('GET', `/performance/reports/${id}/download`);
+    if (!res.ok) showToast('error', 'Error', 'Failed to download report.');
+  }
+
+  init();
+</script>
+</body>
+</html>

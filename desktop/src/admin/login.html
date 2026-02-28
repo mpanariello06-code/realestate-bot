@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RealEstate Bot — Admin Login</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg-primary:#0f0f1a; --bg-secondary:#1a1a2e; --bg-card:#16213e;
+      --accent-red:#ef4444; --accent-red-light:#f87171;
+      --text-primary:#e2e8f0; --text-secondary:#94a3b8; --border:#2d3748;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Inter', sans-serif; background: var(--bg-primary); color: var(--text-primary);
+      height: 100vh; display: flex; align-items: center; justify-content: center;
+    }
+    .login-wrap {
+      width: 440px; background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: 20px; padding: 44px 40px;
+    }
+    .login-logo { text-align: center; margin-bottom: 36px; }
+    .logo-icon {
+      width: 60px; height: 60px; border-radius: 16px; margin: 0 auto 14px;
+      background: linear-gradient(135deg, #ef4444, #b91c1c);
+      display: flex; align-items: center; justify-content: center; font-size: 26px;
+    }
+    .login-logo h1 { font-size: 22px; font-weight: 800; }
+    .login-logo p { color: var(--text-secondary); font-size: 13px; margin-top: 4px; }
+    .portal-tag {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: rgba(239,68,68,0.15); color: #f87171;
+      padding: 4px 12px; border-radius: 99px; font-size: 11px; font-weight: 600;
+      margin-top: 10px;
+    }
+    .form-group { margin-bottom: 20px; }
+    .form-label { display: block; font-size: 12px; font-weight: 600; color: var(--text-secondary); margin-bottom: 7px; }
+    .input-wrap { position: relative; }
+    .input-wrap i { position: absolute; left: 13px; top: 50%; transform: translateY(-50%); color: var(--text-secondary); font-size: 14px; pointer-events: none; }
+    .form-input {
+      width: 100%; padding: 11px 14px 11px 40px;
+      background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 10px;
+      color: var(--text-primary); font-size: 14px; font-family: inherit; outline: none; transition: border-color 0.15s;
+    }
+    .form-input:focus { border-color: var(--accent-red); box-shadow: 0 0 0 3px rgba(239,68,68,0.15); }
+    .btn-submit {
+      width: 100%; padding: 12px; border-radius: 10px;
+      background: var(--accent-red); color: #fff; border: none;
+      font-size: 14px; font-weight: 700; font-family: inherit;
+      cursor: pointer; transition: background 0.15s;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+    }
+    .btn-submit:hover { background: var(--accent-red-light); }
+    .btn-submit:disabled { opacity: 0.6; cursor: not-allowed; }
+    .error-msg {
+      background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.3);
+      color: #f87171; border-radius: 8px; padding: 10px 14px;
+      font-size: 13px; display: none; margin-bottom: 18px;
+    }
+    .spinner {
+      width: 18px; height: 18px; border: 2px solid rgba(255,255,255,0.3);
+      border-top-color: #fff; border-radius: 50%; animation: spin 0.7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .switch-link { text-align: center; margin-top: 22px; font-size: 12px; color: var(--text-secondary); }
+    .switch-link a { color: #f87171; cursor: pointer; font-weight: 600; }
+  </style>
+</head>
+<body>
+  <div class="login-wrap">
+    <div class="login-logo">
+      <div class="logo-icon"><i class="fa-solid fa-shield-halved"></i></div>
+      <h1>RealEstate Bot</h1>
+      <p>Sign in with your admin credentials</p>
+      <span class="portal-tag"><i class="fa-solid fa-shield-halved"></i> Admin Portal</span>
+    </div>
+
+    <div class="error-msg" id="errorMsg"></div>
+
+    <div class="form-group">
+      <label class="form-label">Email Address</label>
+      <div class="input-wrap">
+        <i class="fa-solid fa-envelope"></i>
+        <input type="email" class="form-input" id="email" placeholder="admin@realestate.bot" />
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Password</label>
+      <div class="input-wrap">
+        <i class="fa-solid fa-lock"></i>
+        <input type="password" class="form-input" id="password" placeholder="••••••••" />
+      </div>
+    </div>
+
+    <button class="btn-submit" id="loginBtn" onclick="handleLogin()">
+      <span id="btnText">Sign In as Admin</span>
+    </button>
+
+    <div class="switch-link">
+      <a onclick="window.electronAPI.openClientPortal()">← Back to Client Portal</a>
+    </div>
+  </div>
+
+  <script>
+    document.addEventListener('keydown', (e) => { if (e.key === 'Enter') handleLogin(); });
+
+    async function handleLogin() {
+      const email    = document.getElementById('email').value.trim();
+      const password = document.getElementById('password').value;
+      const btn      = document.getElementById('loginBtn');
+      const errEl    = document.getElementById('errorMsg');
+      const btnText  = document.getElementById('btnText');
+
+      errEl.style.display = 'none';
+      if (!email || !password) { showError('Please enter your email and password.'); return; }
+
+      btn.disabled = true;
+      btnText.innerHTML = '<div class="spinner"></div>';
+
+      try {
+        const result = await window.electronAPI.apiRequest('POST', '/auth/login', { email, password }, null);
+
+        if (result.ok && result.data.access_token) {
+          const user = result.data.user;
+          if (user && user.role !== 'admin') {
+            showError('Access denied. Admin credentials required.');
+            btn.disabled = false; btnText.textContent = 'Sign In as Admin'; return;
+          }
+          await window.electronAPI.storeSet('admin_token', result.data.access_token);
+          await window.electronAPI.storeSet('admin_user', user || { email });
+          window.location.href = 'dashboard.html';
+        } else {
+          showError(result.data?.detail || 'Invalid credentials.');
+        }
+      } catch (err) {
+        showError('Cannot connect to backend. Make sure the server is running.');
+      } finally {
+        btn.disabled = false; btnText.textContent = 'Sign In as Admin';
+      }
+    }
+
+    function showError(msg) {
+      const el = document.getElementById('errorMsg');
+      el.textContent = msg; el.style.display = 'block';
+    }
+  </script>
+</body>
+</html>
