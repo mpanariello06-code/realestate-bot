@@ -44,6 +44,41 @@ An AI-powered real estate agent automation platform that turns WhatsApp into a f
 
 ---
 
+## Quick Start
+
+> **TL;DR — run these five commands and the server is live at `http://localhost:8000`.**
+
+```bash
+# 1. Clone and enter the repo
+git clone https://github.com/mpanariello06-code/realestate-bot.git
+cd realestate-bot
+
+# 2. Create and activate a virtual environment
+python3 -m venv venv && source venv/bin/activate   # Windows PowerShell: venv\Scripts\Activate.ps1
+                                                   # Windows CMD:        venv\Scripts\activate.bat
+
+# 3. Install dependencies
+pip install -r requirements.txt
+
+# 4. Copy the example environment file (edit .env to add real API keys later)
+cp .env.example .env
+
+# 5. Start the server
+uvicorn app.main:app --reload
+```
+
+The database is created automatically on first startup — no migrations needed.
+
+| URL | What you'll find |
+|---|---|
+| `http://localhost:8000/docs` | Interactive API docs (Swagger UI) |
+| `http://localhost:8000/admin/dashboard` | Admin portal |
+| `http://localhost:8000/portal/agent/1/dashboard` | Agent portal (after creating an agent) |
+
+> **No external accounts required to start.** Features that need Twilio, OpenAI, or social APIs log a warning and return a graceful fallback when the keys are missing.
+
+---
+
 ## Prerequisites
 
 | Requirement | Minimum version | Notes |
