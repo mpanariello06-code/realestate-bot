@@ -29,7 +29,7 @@ def admin_dashboard(request: Request, db: Session = Depends(get_db)):
     from app.models.agent import Agent
 
     total_clients = db.query(Agent).count()
-    active_clients = db.query(Agent).filter(Agent.is_active == True).count()  # noqa: E712
+    active_clients = db.query(Agent).filter(Agent.is_active.is_(True)).count()
     total_leads = db.query(Lead).count()
     pending_invoices = db.query(Invoice).filter(Invoice.status == "pending").all()
     revenue_this_month = sum(
@@ -146,7 +146,7 @@ def all_performance(db: Session = Depends(get_db)):
     from app.models.agent import Agent
     from app.services.reporting import generate_weekly_report
 
-    agents = db.query(Agent).filter(Agent.is_active == True).all()  # noqa: E712
+    agents = db.query(Agent).filter(Agent.is_active.is_(True)).all()
     return [
         {"agent_id": a.id, "agent_name": a.name, **generate_weekly_report(a.id, db)}
         for a in agents

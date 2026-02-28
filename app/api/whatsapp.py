@@ -166,7 +166,7 @@ def _handle_lead_message(from_number: str, body: str, parsed: dict, db: Session)
     """Handle an inbound message from an unknown number (treat as a lead)."""
     # For simplicity, assign to first active agent or leave unassigned
     # In production you would route by campaign/number
-    default_agent = db.query(Agent).filter(Agent.is_active == True).first()  # noqa: E712
+    default_agent = db.query(Agent).filter(Agent.is_active.is_(True)).first()
     if default_agent is None:
         return "Thank you for your message! An agent will be in touch shortly."
 
