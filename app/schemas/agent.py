@@ -20,6 +20,7 @@ class AgentUpdate(BaseModel):
     email: Optional[str] = None
     phone: Optional[str] = None
     whatsapp_number: Optional[str] = None
+    telegram_chat_id: Optional[str] = None
     facebook_token: Optional[str] = None
     instagram_token: Optional[str] = None
     tiktok_token: Optional[str] = None
@@ -28,6 +29,7 @@ class AgentUpdate(BaseModel):
 
 class AgentResponse(AgentBase):
     id: int
+    telegram_chat_id: Optional[str] = None
     facebook_token: Optional[str] = None
     instagram_token: Optional[str] = None
     tiktok_token: Optional[str] = None

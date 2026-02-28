@@ -20,6 +20,7 @@ class LeadSource(str, enum.Enum):
     INSTAGRAM = "instagram"
     TIKTOK = "tiktok"
     WHATSAPP = "whatsapp"
+    TELEGRAM = "telegram"
     REFERRAL = "referral"
     OTHER = "other"
 

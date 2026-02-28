@@ -301,6 +301,86 @@ When you're ready to go live:
 
 ---
 
+## Connecting the Telegram Bot
+
+The bot also supports Telegram, offering the same commands and lead-qualification features as WhatsApp. Unlike WhatsApp, Telegram **does support group chats** — you can add the bot to a group and agents can send commands there.
+
+### Step 1 — Create a Telegram bot
+
+1. Open Telegram and search for [@BotFather](https://t.me/BotFather).  
+2. Send `/newbot` and follow the prompts (choose a name and username).  
+3. BotFather gives you an **API token** that looks like `123456789:ABCdef…`.  
+4. Add it to your `.env`:
+
+   ```env
+   TELEGRAM_BOT_TOKEN=123456789:ABCdef…
+   ```
+
+### Step 2 — Register the webhook
+
+The bot uses Telegram's webhook mode. Set your public HTTPS URL in `.env`:
+
+```env
+BASE_URL=https://yourapp.com
+```
+
+The server auto-registers `https://yourapp.com/webhook/telegram` with Telegram on startup when both `TELEGRAM_BOT_TOKEN` and a non-localhost `BASE_URL` are set.
+
+For local development with ngrok:
+
+```bash
+ngrok http 8000
+# Copy the https URL, e.g. https://abc123.ngrok.io
+```
+
+Then set in `.env`:
+```env
+BASE_URL=https://abc123.ngrok.io
+TELEGRAM_BOT_TOKEN=123456789:ABCdef…
+```
+
+And restart the server — the webhook is registered automatically.  
+
+Or register manually at any time:
+```bash
+curl "https://api.telegram.org/bot<TOKEN>/setWebhook?url=https://abc123.ngrok.io/webhook/telegram"
+```
+
+### Step 3 — Register your agent's Telegram chat ID
+
+The bot identifies agents by their **Telegram chat ID**. To find your chat ID, send any message to your bot — the server logs the incoming `chat_id`. Then register it via the API:
+
+```bash
+curl -s -X PATCH http://localhost:8000/portal/agent/1 \
+  -H "Content-Type: application/json" \
+  -d '{"telegram_chat_id": "123456789"}'
+```
+
+Replace `1` with your agent's ID and `123456789` with your actual Telegram chat ID.
+
+### Step 4 — Start chatting
+
+Open a direct message with your bot on Telegram and send:
+
+```
+HELP
+```
+
+The bot replies with the full list of commands. To post a listing, send a photo with the caption:
+
+```
+POST 3-bedroom house in Sydney — open kitchen, stunning views
+```
+
+### Using the bot in a Telegram group
+
+1. Add your bot to a group (search its `@username` in the "Add member" dialog).  
+2. Each agent in the group must have their Telegram user ID registered (Step 3 above).  
+3. Send commands directly — `POST`, `LIST`, `LEADS`, `PERFORMANCE`, `HELP`.  
+4. **Lead messages from groups are currently attributed to the group's chat ID**; direct private messages are recommended for lead qualification.
+
+---
+
 ## Environment Variables
 
 ### Required to enable WhatsApp messaging
@@ -310,6 +390,12 @@ When you're ready to go live:
 | `TWILIO_ACCOUNT_SID` | Your Twilio Account SID — found at [console.twilio.com](https://console.twilio.com) |
 | `TWILIO_AUTH_TOKEN` | Your Twilio Auth Token — same page |
 | `TWILIO_WHATSAPP_NUMBER` | The Twilio WhatsApp sender in `whatsapp:+1…` format |
+
+### Required to enable the Telegram bot
+
+| Variable | Description |
+|---|---|
+| `TELEGRAM_BOT_TOKEN` | Bot token from [@BotFather](https://t.me/BotFather) — looks like `123456:ABCdef…` |
 
 ### Required to enable AI lead qualification
 
@@ -351,12 +437,33 @@ Any other inbound message from an **unregistered** number is treated as a lead i
 
 ---
 
+## Telegram Bot Commands (for agents)
+
+Identical to WhatsApp commands — use the same keywords in a direct message or group:
+
+| Command | Action |
+|---|---|
+| `POST <description>` + optional photo/video | Creates listing and posts to all connected social platforms |
+| `LIST` | Shows your 5 most recent active listings |
+| `LEADS` | Shows recent leads with qualification scores |
+| `PERFORMANCE` | Shows this week's performance summary |
+| `HELP` or `/start` | Shows all available commands |
+
+Any message from an **unregistered** Telegram user is treated as a lead inquiry.
+
+---
+
 ## API Endpoints
 
 ### WhatsApp
 | Method | Path | Description |
 |---|---|---|
 | POST | `/webhook/whatsapp` | Twilio webhook receiver |
+
+### Telegram
+| Method | Path | Description |
+|---|---|---|
+| POST | `/webhook/telegram` | Telegram Bot API webhook receiver |
 
 ### Listings
 | Method | Path | Description |

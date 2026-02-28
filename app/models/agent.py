@@ -14,6 +14,7 @@ class Agent(Base):
     email = Column(String, unique=True, nullable=False, index=True)
     phone = Column(String, nullable=False)
     whatsapp_number = Column(String, unique=True, nullable=False, index=True)
+    telegram_chat_id = Column(String, unique=True, nullable=True, index=True)
     facebook_token = Column(String, nullable=True)
     instagram_token = Column(String, nullable=True)
     tiktok_token = Column(String, nullable=True)

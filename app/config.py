@@ -16,6 +16,7 @@ class Settings:
         self.FACEBOOK_APP_SECRET: str = os.getenv("FACEBOOK_APP_SECRET", "")
         self.INSTAGRAM_ACCESS_TOKEN: str = os.getenv("INSTAGRAM_ACCESS_TOKEN", "")
         self.TIKTOK_ACCESS_TOKEN: str = os.getenv("TIKTOK_ACCESS_TOKEN", "")
+        self.TELEGRAM_BOT_TOKEN: str = os.getenv("TELEGRAM_BOT_TOKEN", "")
         self.SECRET_KEY: str = os.getenv("SECRET_KEY", "changeme-secret-key")
         self.ADMIN_WHATSAPP_NUMBER: str = os.getenv("ADMIN_WHATSAPP_NUMBER", "")
         self.BASE_URL: str = os.getenv("BASE_URL", "http://localhost:8000")
