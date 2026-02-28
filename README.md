@@ -1,19 +1,20 @@
 # 🏠 Real Estate Bot Platform
 
-An AI-powered real estate agent automation platform that turns WhatsApp into a full social-media publishing and lead-qualification engine.
+An AI-powered real estate agent automation platform with a **Telegram bot** (and WhatsApp support) for social-media publishing, lead qualification, and performance reporting.
 
 ---
 
 ## Features
 
-- **WhatsApp Bot** — agents send photos/videos + a description; the bot posts to all connected social platforms automatically and replies to inbound leads
+- **Telegram Bot** — agents send photos/videos + a description via Telegram; the bot posts to all connected social platforms and replies to inbound leads *(new!)*
+- **WhatsApp Bot** — same features available over WhatsApp via Twilio
 - **AI Lead Qualification** — OpenAI GPT analyses every conversation and scores leads 0-100
 - **AI Receptionist** — Twilio Programmable Voice calls leads with a configurable qualification script
 - **Social Media Publishing** — one-tap posting to Facebook, Instagram, and TikTok via their Graph/Open APIs
 - **Agent Portal** — web UI to connect social accounts, view listings, manage leads, and read performance reports
 - **Admin Portal** — platform-owner UI to manage all clients, create invoices, and monitor aggregate performance
 - **Performance Tracking** — weekly follower counts, deals closed, average response time, and trend arrows
-- **WhatsApp Notifications** — agents receive instant alerts for qualified leads
+- **Instant Notifications** — agents receive qualified-lead alerts via Telegram and/or WhatsApp
 
 ---
 
@@ -23,23 +24,25 @@ An AI-powered real estate agent automation platform that turns WhatsApp into a f
 ┌──────────────────────────────────────────────────────┐
 │                    FastAPI Application                │
 │                                                      │
-│  /webhook/whatsapp  →  WhatsApp Handler              │
+│  /webhook/telegram  →  Telegram Handler  ◀── Telegram│
+│  /webhook/whatsapp  →  WhatsApp Handler  ◀── Twilio  │
 │  /listings          →  Listings CRUD                 │
 │  /leads             →  Leads CRUD + AI Qualify       │
 │  /portal/agent/*    →  Agent Portal (HTML + REST)    │
 │  /admin/*           →  Admin Portal (HTML + REST)    │
 └───────────┬──────────────────────────────────────────┘
             │
-     ┌──────▼──────┐      ┌───────────────┐
-     │  SQLAlchemy │      │    Services    │
-     │  SQLite/PG  │      │               │
-     └─────────────┘      │ whatsapp_svc  │──▶ Twilio
-                          │ lead_qualifier│──▶ OpenAI
-                          │ social_media  │──▶ FB/IG/TikTok
-                          │ ai_receptionist──▶ Twilio Voice
-                          │ reporting     │
-                          │ notifications │
-                          └───────────────┘
+     ┌──────▼──────┐      ┌───────────────────┐
+     │  SQLAlchemy │      │      Services      │
+     │  SQLite/PG  │      │                   │
+     └─────────────┘      │ telegram_service ─│──▶ Telegram API
+                          │ whatsapp_svc     ─│──▶ Twilio
+                          │ lead_qualifier   ─│──▶ OpenAI
+                          │ social_media     ─│──▶ FB/IG/TikTok
+                          │ ai_receptionist  ─│──▶ Twilio Voice
+                          │ reporting         │
+                          │ notifications     │
+                          └───────────────────┘
 ```
 
 ---
@@ -60,7 +63,7 @@ pip install -r requirements.txt
 python run.py
 ```
 
-That's it — **no environment variables or API keys are needed to start**. The database (`realestate.db`) is created automatically on first run. Features that require external services (Twilio, OpenAI, Facebook, etc.) simply log a warning and skip gracefully when keys are not set.
+That's it — **no environment variables or API keys are needed to start**. The database (`realestate.db`) is created automatically on first run. Features that require external services (Telegram, Twilio, OpenAI, Facebook, etc.) simply log a warning and skip gracefully when keys are not set.
 
 | URL | What you'll find |
 |---|---|
@@ -68,8 +71,23 @@ That's it — **no environment variables or API keys are needed to start**. The 
 | `http://localhost:8000/admin/dashboard` | Admin portal |
 | `http://localhost:8000/portal/agent/1/dashboard` | Agent portal (after creating an agent) |
 
-> Want to enable WhatsApp messaging, AI qualification, or social posting?  
-> Copy `.env.example` to `.env`, fill in the relevant keys, then restart the server.
+### Quick Telegram setup
+
+After starting the server, run the interactive setup helper:
+
+```bash
+# Copy and fill in your Telegram bot token first
+cp .env.example .env
+# Edit .env → set TELEGRAM_BOT_TOKEN=<your token from @BotFather>
+
+python setup_telegram.py
+```
+
+The helper will walk you through every step automatically — token verification, chat ID detection, agent registration, and webhook setup.  
+See **[Connecting the Telegram Bot](#connecting-the-telegram-bot)** for the full manual walkthrough.
+
+> Want to also enable AI qualification or social posting?  
+> Fill in the remaining keys in `.env` and restart the server.
 
 ---
 
@@ -348,7 +366,25 @@ curl "https://api.telegram.org/bot<TOKEN>/setWebhook?url=https://abc123.ngrok.io
 
 ### Step 3 — Register your agent's Telegram chat ID
 
-The bot identifies agents by their **Telegram chat ID**. To find your chat ID, send any message to your bot — the server logs the incoming `chat_id`. Then register it via the API:
+The bot identifies agents by their **Telegram chat ID**. The easiest way to find and register it is with the setup helper:
+
+```bash
+python setup_telegram.py
+```
+
+The script will:
+- Send a test message from your Telegram account to the bot.
+- Print your chat ID.
+- Let you pick (or create) an agent from the database.
+- Save the chat ID automatically.
+
+**Manual alternative** — Send any message to your bot, then check the server logs for a line like:
+
+```
+INFO: Telegram webhook for chat 123456789
+```
+
+Then register it via the API:
 
 ```bash
 curl -s -X PATCH http://localhost:8000/portal/agent/1 \
