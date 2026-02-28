@@ -75,16 +75,20 @@ async def main() -> None:
     # Graceful shutdown handler
     # -----------------------------------------------------------------------
     stop_event = asyncio.Event()
+    loop = asyncio.get_event_loop()
 
     def _handle_signal(*_) -> None:
         logger.info("Shutdown signal received")
-        stop_event.set()
+        # Use call_soon_threadsafe so this is safe to call from a Windows
+        # signal context where the function runs outside the event loop.
+        loop.call_soon_threadsafe(stop_event.set)
 
     for sig in (signal.SIGINT, signal.SIGTERM):
         try:
-            asyncio.get_event_loop().add_signal_handler(sig, _handle_signal)
+            loop.add_signal_handler(sig, _handle_signal)
         except NotImplementedError:
-            # Windows does not support add_signal_handler
+            # Windows does not support add_signal_handler; fall back to
+            # signal.signal which calls _handle_signal from a thread context.
             signal.signal(sig, _handle_signal)
 
     # -----------------------------------------------------------------------

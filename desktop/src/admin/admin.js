@@ -34,8 +34,14 @@ async function checkAdminAuth() {
 function exportToCSV(data, filename) {
   if (!data || !data.length) { showToast('warning', 'No data to export'); return; }
   const keys = Object.keys(data[0]);
-  const rows = [keys.join(','), ...data.map(row => keys.map(k => JSON.stringify(row[k] ?? '')).join(','))];
-  const blob = new Blob([rows.join('\n')], { type: 'text/csv' });
+  // RFC 4180: quote fields containing commas, newlines, or double-quotes;
+  // escape internal double-quotes by doubling them.
+  const escapeField = v => {
+    const s = v == null ? '' : String(v);
+    return /[,"\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+  };
+  const rows = [keys.map(escapeField).join(','), ...data.map(row => keys.map(k => escapeField(row[k])).join(','))];
+  const blob = new Blob([rows.join('\r\n')], { type: 'text/csv' });
   const url  = URL.createObjectURL(blob);
   const a    = document.createElement('a');
   a.href = url; a.download = filename || 'export.csv'; a.click();

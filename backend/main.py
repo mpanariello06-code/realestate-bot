@@ -53,6 +53,12 @@ _ADMIN_PASSWORD_PLAIN = os.getenv("ADMIN_PASSWORD", "admin")
 # Pre-hash once at import time; avoid re-hashing on every login request.
 _ADMIN_PASSWORD_HASH: str = pwd_context.hash(_ADMIN_PASSWORD_PLAIN)
 
+if _ADMIN_PASSWORD_PLAIN in ("admin", "change_this_password", ""):
+    logger.warning(
+        "ADMIN_PASSWORD is set to a default/weak value. "
+        "Set a strong ADMIN_PASSWORD in your .env file before deploying."
+    )
+
 # ---------------------------------------------------------------------------
 # App
 # ---------------------------------------------------------------------------
