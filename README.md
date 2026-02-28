@@ -46,28 +46,21 @@ An AI-powered real estate agent automation platform that turns WhatsApp into a f
 
 ## Quick Start
 
-> **TL;DR — run these five commands and the server is live at `http://localhost:8000`.**
+> **Three commands and the server is live at `http://localhost:8000`.**
 
 ```bash
 # 1. Clone and enter the repo
 git clone https://github.com/mpanariello06-code/realestate-bot.git
 cd realestate-bot
 
-# 2. Create and activate a virtual environment
-python3 -m venv venv && source venv/bin/activate   # Windows PowerShell: venv\Scripts\Activate.ps1
-                                                   # Windows CMD:        venv\Scripts\activate.bat
-
-# 3. Install dependencies
+# 2. Install dependencies  (Python 3.11+ required)
 pip install -r requirements.txt
 
-# 4. Copy the example environment file (edit .env to add real API keys later)
-cp .env.example .env
-
-# 5. Start the server
-uvicorn app.main:app --reload
+# 3. Start the server
+python run.py
 ```
 
-The database is created automatically on first startup — no migrations needed.
+That's it — **no environment variables or API keys are needed to start**. The database (`realestate.db`) is created automatically on first run. Features that require external services (Twilio, OpenAI, Facebook, etc.) simply log a warning and skip gracefully when keys are not set.
 
 | URL | What you'll find |
 |---|---|
@@ -75,7 +68,8 @@ The database is created automatically on first startup — no migrations needed.
 | `http://localhost:8000/admin/dashboard` | Admin portal |
 | `http://localhost:8000/portal/agent/1/dashboard` | Agent portal (after creating an agent) |
 
-> **No external accounts required to start.** Features that need Twilio, OpenAI, or social APIs log a warning and return a graceful fallback when the keys are missing.
+> Want to enable WhatsApp messaging, AI qualification, or social posting?  
+> Copy `.env.example` to `.env`, fill in the relevant keys, then restart the server.
 
 ---
 
@@ -121,16 +115,26 @@ venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 ```
 
-### 4. Configure environment variables
+### 4. Configure environment variables (optional)
+
+The server starts fine without any `.env` file — all external-service features (WhatsApp, AI, social posting) are disabled automatically when keys are missing and log a warning instead of crashing.
+
+To enable those features later:
 
 ```bash
 cp .env.example .env
+# then open .env in any text editor and fill in the relevant keys
 ```
 
-Open `.env` in any text editor and fill in your credentials.  
-See the [Environment Variables](#environment-variables) table below — required keys are marked **Required**.
+See the [Environment Variables](#environment-variables) table below for details.
 
 ### 5. Start the server
+
+```bash
+python run.py
+```
+
+Or, if you prefer the uvicorn command directly:
 
 ```bash
 uvicorn app.main:app --reload
@@ -322,15 +326,20 @@ Any other inbound message from an **unregistered** number is treated as a lead i
 
 ## Running Tests
 
+First install the dev dependencies (adds `pytest` on top of the regular requirements):
+
+```bash
+pip install -r requirements-dev.txt
+```
+
+Then run:
+
 ```bash
 # Run all tests
 pytest tests/ -v
 
 # Run a specific test file
 pytest tests/test_lead_qualifier.py -v
-
-# Run tests without external API calls (all tests are already mocked)
-pytest tests/ -v --tb=short
 ```
 
 Tests use an in-memory SQLite database and mock all external services (Twilio, OpenAI, social APIs), so they run fully offline with no credentials needed.
@@ -342,7 +351,7 @@ Tests use an in-memory SQLite database and mock all external services (Twilio, O
 ```
 app/
 ├── main.py               # FastAPI app + router registration
-├── config.py             # Pydantic settings
+├── config.py             # App settings (reads env vars / .env file)
 ├── database.py           # SQLAlchemy setup
 ├── models/               # SQLAlchemy ORM models
 ├── schemas/              # Pydantic request/response schemas

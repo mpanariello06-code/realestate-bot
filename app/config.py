@@ -1,21 +1,24 @@
-from pydantic_settings import BaseSettings, SettingsConfigDict
+import os
+
+from dotenv import load_dotenv
+
+load_dotenv(override=False)  # load .env if present; already-set env vars take priority
 
 
-class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
-
-    DATABASE_URL: str = "sqlite:///./realestate.db"
-    TWILIO_ACCOUNT_SID: str = ""
-    TWILIO_AUTH_TOKEN: str = ""
-    TWILIO_WHATSAPP_NUMBER: str = "whatsapp:+14155238886"
-    OPENAI_API_KEY: str = ""
-    FACEBOOK_APP_ID: str = ""
-    FACEBOOK_APP_SECRET: str = ""
-    INSTAGRAM_ACCESS_TOKEN: str = ""
-    TIKTOK_ACCESS_TOKEN: str = ""
-    SECRET_KEY: str = "changeme-secret-key"
-    ADMIN_WHATSAPP_NUMBER: str = ""
-    BASE_URL: str = "http://localhost:8000"
+class Settings:
+    def __init__(self) -> None:
+        self.DATABASE_URL: str = os.getenv("DATABASE_URL", "sqlite:///./realestate.db")
+        self.TWILIO_ACCOUNT_SID: str = os.getenv("TWILIO_ACCOUNT_SID", "")
+        self.TWILIO_AUTH_TOKEN: str = os.getenv("TWILIO_AUTH_TOKEN", "")
+        self.TWILIO_WHATSAPP_NUMBER: str = os.getenv("TWILIO_WHATSAPP_NUMBER", "whatsapp:+14155238886")
+        self.OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
+        self.FACEBOOK_APP_ID: str = os.getenv("FACEBOOK_APP_ID", "")
+        self.FACEBOOK_APP_SECRET: str = os.getenv("FACEBOOK_APP_SECRET", "")
+        self.INSTAGRAM_ACCESS_TOKEN: str = os.getenv("INSTAGRAM_ACCESS_TOKEN", "")
+        self.TIKTOK_ACCESS_TOKEN: str = os.getenv("TIKTOK_ACCESS_TOKEN", "")
+        self.SECRET_KEY: str = os.getenv("SECRET_KEY", "changeme-secret-key")
+        self.ADMIN_WHATSAPP_NUMBER: str = os.getenv("ADMIN_WHATSAPP_NUMBER", "")
+        self.BASE_URL: str = os.getenv("BASE_URL", "http://localhost:8000")
 
 
 settings = Settings()
