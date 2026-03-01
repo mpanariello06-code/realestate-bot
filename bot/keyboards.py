@@ -65,3 +65,12 @@ def confirm_post_keyboard() -> InlineKeyboardMarkup:
             InlineKeyboardButton("❌ Cancel", callback_data="cancel"),
         ],
     ])
+
+
+def qualify_action_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("💾 Save to Leads", callback_data="qualify_save"),
+            InlineKeyboardButton("🗑 Discard", callback_data="qualify_discard"),
+        ],
+    ])

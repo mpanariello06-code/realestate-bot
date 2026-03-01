@@ -44,6 +44,7 @@ from bot.keyboards import (
     lead_action_keyboard,
     main_menu_keyboard,
     posting_platform_keyboard,
+    qualify_action_keyboard,
 )
 from services import lead_qualifier, sheets, social_poster
 from services.weekly_report import send_weekly_report
@@ -57,7 +58,9 @@ logger = logging.getLogger(__name__)
     AWAITING_PLATFORM,
     AWAITING_CAPTION_EDIT,
     AWAITING_CONFIRM,
-) = range(5)
+    AWAITING_QUALIFY_MESSAGE,
+    AWAITING_QUALIFY_SAVE,
+) = range(7)
 
 # Context keys
 CTX_MEDIA_PATH = "media_path"
@@ -65,6 +68,7 @@ CTX_MEDIA_TYPE = "media_type"   # "photo" | "video"
 CTX_DESCRIPTION = "description"
 CTX_CAPTION = "caption"
 CTX_PLATFORM = "platform"
+CTX_QUALIFY_RESULT = "qualify_result"
 
 
 # ── Guards ────────────────────────────────────────────────────────────────────
@@ -118,7 +122,9 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         "*Available Commands*\n\n"
         "/start – Main menu\n"
         "/post – Post a new property listing\n"
+        "/qualify – Paste a lead message to get an instant AI score & follow-up questions\n"
         "/leads – View qualified leads\n"
+        "/notes – Add a note to a lead (e.g. `/notes 3 Viewing Saturday 2pm`)\n"
         "/performance – View performance stats\n"
         "/report – Send the weekly report now\n"
         "/myid – Show your Telegram chat ID (useful for setup)\n"
@@ -146,6 +152,133 @@ async def cmd_myid(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         "   `AGENT_CHAT_IDS=111111111,222222222`",
         parse_mode=ParseMode.MARKDOWN,
     )
+
+
+# ── /qualify ──────────────────────────────────────────────────────────────────
+
+def _format_qualify_result(result: dict) -> str:
+    """Format a qualify_lead() result dict as a Telegram Markdown message."""
+    score = result.get("score", 0)
+    threshold = config.LEAD_QUALIFICATION_THRESHOLD
+    if score >= threshold:
+        indicator = "🟢 Qualified"
+    elif score >= threshold // 2:
+        indicator = "🟡 Borderline"
+    else:
+        indicator = "🔴 Not Qualified"
+
+    intent = result.get("intent", "unknown").title()
+    budget = result.get("budget") or "Not mentioned"
+    timeline = result.get("timeline") or "Not mentioned"
+    location = result.get("location") or "Not mentioned"
+    summary = result.get("summary", "")
+    questions = result.get("follow_up_questions", [])
+
+    lines = [
+        "*🔍 Lead Qualification Result*\n",
+        f"Score: *{score}/100* {indicator}",
+        f"Intent: *{intent}*",
+        f"Budget: {budget}",
+        f"Timeline: {timeline}",
+        f"Location: {location}",
+        f"\n*📝 Summary:*\n{summary}",
+    ]
+    if questions:
+        lines.append("\n*❓ Suggested Follow-up Questions:*")
+        for i, q in enumerate(questions, 1):
+            lines.append(f"{i}. {q}")
+    lines.append("\nSave this lead to your sheet?")
+    return "\n".join(lines)
+
+
+async def cmd_qualify(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Start the qualify flow – ask the agent to paste the prospect's message."""
+    if not await _agent_only(update, context):
+        return ConversationHandler.END
+    await update.effective_message.reply_text(
+        "📋 *Qualify a Lead*\n\n"
+        "Paste the enquiry message from the prospect (WhatsApp, DM, email, etc.) "
+        "and I'll score it instantly.",
+        parse_mode=ParseMode.MARKDOWN,
+    )
+    return AWAITING_QUALIFY_MESSAGE
+
+
+async def handle_qualify_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Receive the prospect's message, run AI qualification, show results."""
+    message_text = update.effective_message.text or ""
+    await update.effective_message.reply_text("🤖 Analysing lead…")
+
+    result = lead_qualifier.qualify_lead(message_text)
+    result["message"] = message_text
+    context.user_data[CTX_QUALIFY_RESULT] = result
+
+    await update.effective_message.reply_text(
+        _format_qualify_result(result),
+        parse_mode=ParseMode.MARKDOWN,
+        reply_markup=qualify_action_keyboard(),
+    )
+    return AWAITING_QUALIFY_SAVE
+
+
+async def handle_qualify_save_callback(
+    update: Update, context: ContextTypes.DEFAULT_TYPE
+) -> int:
+    """Handle the Save / Discard button after qualification."""
+    query = update.callback_query
+    await query.answer()
+
+    if query.data == "qualify_discard":
+        context.user_data.pop(CTX_QUALIFY_RESULT, None)
+        await query.edit_message_text("🗑 Lead discarded.")
+        return ConversationHandler.END
+
+    if query.data == "qualify_save":
+        result = context.user_data.pop(CTX_QUALIFY_RESULT, {})
+        result.setdefault("platform", "telegram")
+        saved = sheets.save_lead(result)
+        if saved:
+            await query.edit_message_text("✅ Lead saved to your Google Sheet!")
+        else:
+            await query.edit_message_text(
+                "❌ Could not save lead – check your Google Sheets connection."
+            )
+        return ConversationHandler.END
+
+    return AWAITING_QUALIFY_SAVE
+
+
+# ── /notes ────────────────────────────────────────────────────────────────────
+
+async def cmd_notes(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """
+    /notes <lead_number> <note text>
+
+    Add or update the agent notes for a specific lead.
+    Example: /notes 3 Called back – viewing Saturday at 2pm
+    """
+    if not await _agent_only(update, context):
+        return
+    args = context.args or []
+    if len(args) < 2 or not args[0].isdigit():
+        await update.effective_message.reply_text(
+            "Usage: `/notes <lead_number> <your note>`\n"
+            "Example: `/notes 3 Called back – viewing Saturday at 2pm`",
+            parse_mode=ParseMode.MARKDOWN,
+        )
+        return
+    lead_num = int(args[0])
+    note_text = " ".join(args[1:])
+    success = sheets.save_lead_notes(lead_num, note_text)
+    if success:
+        await update.effective_message.reply_text(
+            f"✅ Notes saved for lead #{lead_num}."
+        )
+    else:
+        await update.effective_message.reply_text(
+            f"❌ Could not save notes for lead #{lead_num}. "
+            "Check the lead number and your Google Sheets connection."
+        )
 
 
 # ── /leads ────────────────────────────────────────────────────────────────────
@@ -474,6 +607,24 @@ def build_application() -> Application:
     )
     app.add_handler(post_conv)
 
+    # Qualify lead conversation
+    qualify_conv = ConversationHandler(
+        entry_points=[CommandHandler("qualify", cmd_qualify)],
+        states={
+            AWAITING_QUALIFY_MESSAGE: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, handle_qualify_message),
+            ],
+            AWAITING_QUALIFY_SAVE: [
+                CallbackQueryHandler(
+                    handle_qualify_save_callback,
+                    pattern="^qualify_",
+                ),
+            ],
+        },
+        fallbacks=[CommandHandler("start", cmd_start)],
+    )
+    app.add_handler(qualify_conv)
+
     # Simple commands
     app.add_handler(CommandHandler("start", cmd_start))
     app.add_handler(CommandHandler("help", cmd_help))
@@ -481,6 +632,7 @@ def build_application() -> Application:
     app.add_handler(CommandHandler("leads", cmd_leads))
     app.add_handler(CommandHandler("performance", cmd_performance))
     app.add_handler(CommandHandler("report", cmd_report))
+    app.add_handler(CommandHandler("notes", cmd_notes))
 
     # Callback query handlers
     app.add_handler(

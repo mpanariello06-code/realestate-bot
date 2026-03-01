@@ -193,3 +193,26 @@ def update_lead_status(row_index: int, status: str, notes: str = "") -> bool:
     except Exception as exc:
         logger.error("Failed to update lead status: %s", exc)
         return False
+
+
+def save_lead_notes(row_index: int, notes: str) -> bool:
+    """
+    Update only the agent_notes column for a lead row.
+
+    Parameters
+    ----------
+    row_index : int
+        1-based display index of the lead (as shown by /leads).
+        Row 1 in the sheet is the header; the first lead is row_index=1
+        which maps to sheet row 2.
+    notes : str
+        Free-text note to store against the lead.
+    """
+    try:
+        ws = _get_worksheet("Leads")
+        notes_col = LEADS_HEADERS.index("agent_notes") + 1
+        ws.update_cell(row_index + 1, notes_col, notes)
+        return True
+    except Exception as exc:
+        logger.error("Failed to save lead notes: %s", exc)
+        return False

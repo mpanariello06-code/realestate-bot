@@ -121,6 +121,29 @@ class TestSheets(unittest.TestCase):
         self.assertTrue(result)
         self.assertEqual(mock_ws.update_cell.call_count, 2)
 
+    @patch("services.sheets._get_worksheet")
+    def test_save_lead_notes(self, mock_get_ws):
+        mock_ws = MagicMock()
+        mock_get_ws.return_value = mock_ws
+
+        from services.sheets import save_lead_notes, LEADS_HEADERS
+        result = save_lead_notes(3, "Viewing booked for Saturday")
+        self.assertTrue(result)
+        mock_ws.update_cell.assert_called_once()
+        # row_index=3 (1-based lead number) + 1 (header row) = sheet row 4
+        call_args = mock_ws.update_cell.call_args[0]
+        self.assertEqual(call_args[0], 4)
+        self.assertEqual(call_args[1], LEADS_HEADERS.index("agent_notes") + 1)
+        self.assertEqual(call_args[2], "Viewing booked for Saturday")
+
+    @patch("services.sheets._get_worksheet")
+    def test_save_lead_notes_returns_false_on_error(self, mock_get_ws):
+        mock_get_ws.side_effect = Exception("API error")
+
+        from services.sheets import save_lead_notes
+        result = save_lead_notes(1, "some note")
+        self.assertFalse(result)
+
 
 if __name__ == "__main__":
     unittest.main()
