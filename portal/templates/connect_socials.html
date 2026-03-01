@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>🔗 Connect Your Socials</h1>
+
+<div class="card">
+  <p style="margin-bottom:1.5rem;color:var(--muted)">
+    To allow the bot to post listings and track engagement, add your API credentials
+    to the <code>.env</code> file and restart the bot. The instructions for each
+    platform are below.
+  </p>
+
+  <h2 style="font-size:1.05rem;margin-bottom:.75rem">📘 Facebook & Instagram</h2>
+  <ol style="margin-left:1.25rem;line-height:2">
+    <li>Go to <a href="https://developers.facebook.com/" target="_blank">Facebook Developers</a> and create an app.</li>
+    <li>Add the <strong>Pages API</strong> product.</li>
+    <li>Generate a long-lived <strong>Page Access Token</strong>.</li>
+    <li>Copy your <strong>Page ID</strong> from Page Settings → About.</li>
+    <li>For Instagram: enable the <strong>Instagram Basic Display</strong> or <strong>Instagram Graph API</strong> and copy your <strong>Instagram Business Account ID</strong>.</li>
+    <li>Paste the values into <code>.env</code>:</li>
+  </ol>
+  <pre style="background:var(--bg);padding:1rem;border-radius:6px;margin-top:.5rem;font-size:.82rem;overflow-x:auto">
+FACEBOOK_PAGE_ACCESS_TOKEN=your_token
+FACEBOOK_PAGE_ID=your_page_id
+INSTAGRAM_ACCOUNT_ID=your_instagram_account_id</pre>
+
+  <h2 style="font-size:1.05rem;margin:.75rem 0">🎵 TikTok</h2>
+  <ol style="margin-left:1.25rem;line-height:2">
+    <li>Go to <a href="https://developers.tiktok.com/" target="_blank">TikTok Developers</a> and create an app.</li>
+    <li>Enable the <strong>Content Posting API</strong>.</li>
+    <li>Obtain an <strong>Access Token</strong> and your <strong>Open ID</strong>.</li>
+    <li>Paste the values into <code>.env</code>:</li>
+  </ol>
+  <pre style="background:var(--bg);padding:1rem;border-radius:6px;margin-top:.5rem;font-size:.82rem;overflow-x:auto">
+TIKTOK_ACCESS_TOKEN=your_token
+TIKTOK_OPEN_ID=your_open_id</pre>
+
+  <h2 style="font-size:1.05rem;margin:.75rem 0">📊 Google Sheets</h2>
+  <ol style="margin-left:1.25rem;line-height:2">
+    <li>Go to <a href="https://console.cloud.google.com/" target="_blank">Google Cloud Console</a>.</li>
+    <li>Create a project and enable the <strong>Google Sheets API</strong> and <strong>Google Drive API</strong>.</li>
+    <li>Create a <strong>Service Account</strong> and download the JSON key file.</li>
+    <li>Rename the key file to <code>google_credentials.json</code> and place it in the project root.</li>
+    <li>Share your target Google Sheet with the service account email.</li>
+    <li>Set the spreadsheet name in <code>.env</code>:</li>
+  </ol>
+  <pre style="background:var(--bg);padding:1rem;border-radius:6px;margin-top:.5rem;font-size:.82rem;overflow-x:auto">
+GOOGLE_CREDENTIALS_FILE=google_credentials.json
+GOOGLE_SPREADSHEET_NAME=RealEstate Bot Leads</pre>
+
+  <div style="margin-top:1.5rem;padding:1rem;background:#eff6ff;border-left:4px solid var(--primary);border-radius:4px">
+    <strong>💡 Tip:</strong> After updating <code>.env</code>, restart the bot with <code>python main.py</code>.
+  </div>
+</div>
+{% endblock %}

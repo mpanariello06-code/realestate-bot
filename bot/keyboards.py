@@ -1,0 +1,67 @@
+"""
+Telegram Inline Keyboard helpers.
+"""
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+
+
+def main_menu_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("📸 Post Listing", callback_data="post_listing"),
+            InlineKeyboardButton("📊 Performance", callback_data="performance"),
+        ],
+        [
+            InlineKeyboardButton("🎯 Qualified Leads", callback_data="qualified_leads"),
+            InlineKeyboardButton("📋 All Leads", callback_data="all_leads"),
+        ],
+        [
+            InlineKeyboardButton("📈 Weekly Report", callback_data="weekly_report"),
+        ],
+    ])
+
+
+def posting_platform_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("Facebook", callback_data="platform_facebook"),
+            InlineKeyboardButton("Instagram", callback_data="platform_instagram"),
+            InlineKeyboardButton("TikTok", callback_data="platform_tiktok"),
+        ],
+        [
+            InlineKeyboardButton("All Platforms", callback_data="platform_all"),
+        ],
+        [
+            InlineKeyboardButton("❌ Cancel", callback_data="cancel"),
+        ],
+    ])
+
+
+def lead_action_keyboard(lead_index: int) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton(
+                "✅ Mark Contacted",
+                callback_data=f"lead_contacted_{lead_index}",
+            ),
+            InlineKeyboardButton(
+                "🏆 Mark Closed",
+                callback_data=f"lead_closed_{lead_index}",
+            ),
+        ],
+        [
+            InlineKeyboardButton(
+                "❌ Mark Lost",
+                callback_data=f"lead_lost_{lead_index}",
+            ),
+        ],
+    ])
+
+
+def confirm_post_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("✅ Confirm Post", callback_data="confirm_post"),
+            InlineKeyboardButton("✏️ Edit Caption", callback_data="edit_caption"),
+            InlineKeyboardButton("❌ Cancel", callback_data="cancel"),
+        ],
+    ])
