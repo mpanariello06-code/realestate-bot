@@ -38,6 +38,7 @@ The portal shows:
 | `/leads` | List your top 10 qualified leads with action buttons |
 | `/performance` | Show recent performance stats |
 | `/report` | Trigger the weekly report immediately |
+| `/myid` | **Show your Telegram chat ID** – use this during setup to find the value for `AGENT_CHAT_IDS` |
 | `/help` | Command reference |
 
 ---
@@ -88,7 +89,7 @@ The `.env` file is already named correctly — just open it and fill in your cre
 
 ```env
 TELEGRAM_BOT_TOKEN=your_telegram_bot_token_here
-AGENT_CHAT_IDS=123456789          # your Telegram chat ID
+AGENT_CHAT_IDS=123456789          # your Telegram chat ID (see step below)
 OPENAI_API_KEY=sk-...
 FACEBOOK_PAGE_ACCESS_TOKEN=...
 FACEBOOK_PAGE_ID=...
@@ -100,7 +101,14 @@ GOOGLE_SPREADSHEET_NAME=RealEstate Bot Leads
 FLASK_SECRET_KEY=change-me
 ```
 
-> **Tip:** Find your Telegram chat ID by messaging [@userinfobot](https://t.me/userinfobot).
+> **How to find your Telegram chat ID:**
+> 1. Set only `TELEGRAM_BOT_TOKEN` in `.env` and leave `AGENT_CHAT_IDS` blank for now.
+> 2. Start the bot: `python main.py`
+> 3. Open Telegram and send `/myid` to your bot.
+> 4. The bot replies with your exact chat ID (e.g. `123456789`).
+> 5. Copy that number into `AGENT_CHAT_IDS` in `.env`, then restart the bot.
+>
+> For multiple agents, separate each ID with a comma: `AGENT_CHAT_IDS=111111111,222222222`
 
 ### 3. Set up Google Sheets
 

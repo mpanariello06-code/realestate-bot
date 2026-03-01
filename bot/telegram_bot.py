@@ -82,7 +82,10 @@ async def _agent_only(update: Update, context: ContextTypes.DEFAULT_TYPE) -> boo
     if not _is_agent(update):
         if update.effective_message:
             await update.effective_message.reply_text(
-                "⛔ You are not authorised to use this bot."
+                "⛔ You are not authorised to use this bot.\n\n"
+                "To get access, send /myid to this bot to find your Telegram "
+                "chat ID, then add it to the AGENT_CHAT_IDS line in your .env "
+                "file and restart the bot."
             )
         return False
     return True
@@ -118,7 +121,29 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         "/leads – View qualified leads\n"
         "/performance – View performance stats\n"
         "/report – Send the weekly report now\n"
+        "/myid – Show your Telegram chat ID (useful for setup)\n"
         "/help – This help message",
+        parse_mode=ParseMode.MARKDOWN,
+    )
+
+
+# ── /myid ─────────────────────────────────────────────────────────────────────
+
+async def cmd_myid(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """
+    Open to everyone – replies with the sender's Telegram chat ID so they
+    know exactly what value to put in AGENT_CHAT_IDS inside .env.
+    """
+    chat_id = update.effective_chat.id if update.effective_chat else "unknown"
+    await update.effective_message.reply_text(
+        f"🪪 *Your Telegram Chat ID is:*\n`{chat_id}`\n\n"
+        "To authorise yourself as an agent:\n"
+        "1️⃣ Open the `.env` file in the project folder.\n"
+        "2️⃣ Set `AGENT_CHAT_IDS` to this number:\n"
+        f"   `AGENT_CHAT_IDS={chat_id}`\n"
+        "3️⃣ Save the file and restart the bot with `python main.py`.\n\n"
+        "To add multiple agents, separate each ID with a comma:\n"
+        "   `AGENT_CHAT_IDS=111111111,222222222`",
         parse_mode=ParseMode.MARKDOWN,
     )
 
@@ -452,6 +477,7 @@ def build_application() -> Application:
     # Simple commands
     app.add_handler(CommandHandler("start", cmd_start))
     app.add_handler(CommandHandler("help", cmd_help))
+    app.add_handler(CommandHandler("myid", cmd_myid))
     app.add_handler(CommandHandler("leads", cmd_leads))
     app.add_handler(CommandHandler("performance", cmd_performance))
     app.add_handler(CommandHandler("report", cmd_report))
