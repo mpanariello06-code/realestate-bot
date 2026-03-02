@@ -59,3 +59,11 @@ LEAD_QUALIFICATION_THRESHOLD: int = int(
 # ── Weekly Report ─────────────────────────────────────────────────────────────
 WEEKLY_REPORT_DAY: str = os.getenv("WEEKLY_REPORT_DAY", "mon")
 WEEKLY_REPORT_TIME: str = os.getenv("WEEKLY_REPORT_TIME", "08:00")
+
+# ── Facebook Webhook ──────────────────────────────────────────────────────────
+# Set this to any secret string and configure the same value in the Facebook
+# App Dashboard under Webhooks → Verify Token.
+FACEBOOK_WEBHOOK_VERIFY_TOKEN: str = os.getenv("FACEBOOK_WEBHOOK_VERIFY_TOKEN", "")
+# Used to validate the X-Hub-Signature-256 header on incoming webhook payloads.
+# Set to your Facebook App Secret (found in App → Settings → Basic).
+FACEBOOK_APP_SECRET: str = os.getenv("FACEBOOK_APP_SECRET", "")

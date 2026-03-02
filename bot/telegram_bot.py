@@ -103,7 +103,7 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.effective_message.reply_text(
         "👋 *Welcome to the Real Estate Agent Bot!*\n\n"
         "I help you:\n"
-        "• 📸 Post listings to Facebook, Instagram & TikTok\n"
+        "• 📸 Post listings to Facebook & Instagram\n"
         "• 🎯 Qualify and track leads\n"
         "• 📊 Monitor your performance\n"
         "• 📈 Get weekly reports\n\n"
@@ -494,13 +494,6 @@ async def handle_platform_callback(update: Update, context: ContextTypes.DEFAULT
             f"✅ Instagram: {res.get('post_id', '')}"
             if res.get("success")
             else f"❌ Instagram: {res.get('error', '')}"
-        )
-    elif platform == "tiktok" and image_path:
-        res = social_poster.post_to_tiktok(caption, image_path)
-        result_text = (
-            f"✅ TikTok: {res.get('publish_id', '')}"
-            if res.get("success")
-            else f"❌ TikTok: {res.get('error', '')}"
         )
     else:
         result_text = "❌ Unknown platform or missing media."

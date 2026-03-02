@@ -1,7 +1,7 @@
 """
 Social Media Poster
-Posts property listings (photos/videos + caption) to Facebook,
-Instagram, and TikTok using their respective APIs.
+Posts property listings (photos/videos + caption) to Facebook and
+Instagram using their respective APIs.
 """
 from __future__ import annotations
 
@@ -172,7 +172,7 @@ def post_listing(
     video_path: str | None = None,
 ) -> dict[str, dict]:
     """
-    Post a property listing to all configured platforms.
+    Post a property listing to all configured platforms (Facebook & Instagram).
 
     Returns a dict mapping platform name → result dict.
     """
@@ -184,10 +184,5 @@ def post_listing(
         results["instagram"] = post_to_instagram(caption, image_url)
     else:
         results["instagram"] = {"success": False, "error": "image_url required for Instagram"}
-
-    if video_path:
-        results["tiktok"] = post_to_tiktok(caption, video_path)
-    else:
-        results["tiktok"] = {"success": False, "error": "video_path required for TikTok"}
 
     return results

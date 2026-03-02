@@ -123,5 +123,162 @@ class TestPortal(unittest.TestCase):
         self.assertIn(b"Connect", resp.data)
 
 
+class TestFacebookWebhook(unittest.TestCase):
+
+    def setUp(self):
+        from portal.app import create_app
+        app = create_app()
+        app.config["TESTING"] = True
+        self.client = app.test_client()
+
+    def test_verify_handshake_success(self):
+        """Facebook sends hub.verify_token matching our config → echo challenge."""
+        import config as cfg
+        cfg.FACEBOOK_WEBHOOK_VERIFY_TOKEN = "mysecret"
+
+        resp = self.client.get(
+            "/webhook/facebook",
+            query_string={
+                "hub.mode": "subscribe",
+                "hub.verify_token": "mysecret",
+                "hub.challenge": "abc123",
+            },
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.assertIn(b"abc123", resp.data)
+
+    def test_verify_handshake_wrong_token(self):
+        """Wrong token → 403."""
+        import config as cfg
+        cfg.FACEBOOK_WEBHOOK_VERIFY_TOKEN = "mysecret"
+
+        resp = self.client.get(
+            "/webhook/facebook",
+            query_string={
+                "hub.mode": "subscribe",
+                "hub.verify_token": "wrongtoken",
+                "hub.challenge": "abc123",
+            },
+        )
+        self.assertEqual(resp.status_code, 403)
+
+    @patch("portal.routes._notify_agents")
+    def test_dm_event_notifies_agents(self, mock_notify):
+        """A messaging event with text should trigger _notify_agents."""
+        import config as cfg
+        cfg.FACEBOOK_APP_SECRET = ""  # skip signature validation
+
+        payload = {
+            "object": "page",
+            "entry": [
+                {
+                    "id": "PAGE123",
+                    "messaging": [
+                        {
+                            "sender": {"id": "USER456"},
+                            "message": {"text": "Is this property still available?"},
+                        }
+                    ],
+                    "changes": [],
+                }
+            ],
+        }
+        resp = self.client.post(
+            "/webhook/facebook",
+            json=payload,
+            content_type="application/json",
+        )
+        self.assertEqual(resp.status_code, 200)
+        mock_notify.assert_called_once()
+        notify_text = mock_notify.call_args[0][0]
+        self.assertIn("Is this property still available?", notify_text)
+        self.assertIn("DM", notify_text)
+
+    @patch("portal.routes._notify_agents")
+    def test_comment_event_notifies_agents(self, mock_notify):
+        """A feed comment event should trigger _notify_agents."""
+        import config as cfg
+        cfg.FACEBOOK_APP_SECRET = ""
+
+        payload = {
+            "object": "page",
+            "entry": [
+                {
+                    "id": "PAGE123",
+                    "messaging": [],
+                    "changes": [
+                        {
+                            "field": "feed",
+                            "value": {
+                                "item": "comment",
+                                "from": {"name": "Jane Doe"},
+                                "message": "Love this place!",
+                                "post_id": "POST789",
+                            },
+                        }
+                    ],
+                }
+            ],
+        }
+        resp = self.client.post(
+            "/webhook/facebook",
+            json=payload,
+            content_type="application/json",
+        )
+        self.assertEqual(resp.status_code, 200)
+        mock_notify.assert_called_once()
+        notify_text = mock_notify.call_args[0][0]
+        self.assertIn("Love this place!", notify_text)
+        self.assertIn("Jane Doe", notify_text)
+
+    @patch("portal.routes._notify_agents")
+    def test_unknown_object_does_not_notify(self, mock_notify):
+        """Events for non-page objects should be silently ignored."""
+        import config as cfg
+        cfg.FACEBOOK_APP_SECRET = ""
+
+        payload = {"object": "user", "entry": []}
+        resp = self.client.post(
+            "/webhook/facebook",
+            json=payload,
+            content_type="application/json",
+        )
+        self.assertEqual(resp.status_code, 200)
+        mock_notify.assert_not_called()
+
+
+class TestVerifyFbSignature(unittest.TestCase):
+
+    def test_valid_signature_accepted(self):
+        import hmac as _hmac
+        import hashlib
+        import config as cfg
+        cfg.FACEBOOK_APP_SECRET = "test_secret"
+
+        payload = b'{"test": "data"}'
+        sig = "sha256=" + _hmac.new(
+            b"test_secret", payload, hashlib.sha256
+        ).hexdigest()
+
+        from portal.routes import _verify_fb_signature
+        self.assertTrue(_verify_fb_signature(payload, sig))
+
+    def test_invalid_signature_rejected(self):
+        import config as cfg
+        cfg.FACEBOOK_APP_SECRET = "test_secret"
+
+        from portal.routes import _verify_fb_signature
+        self.assertFalse(_verify_fb_signature(b"data", "sha256=badhash"))
+
+    def test_no_app_secret_skips_validation(self):
+        import config as cfg
+        cfg.FACEBOOK_APP_SECRET = ""
+
+        from portal.routes import _verify_fb_signature
+        # Without an app secret, any payload passes
+        self.assertTrue(_verify_fb_signature(b"anything", ""))
+
+
 if __name__ == "__main__":
     unittest.main()
+

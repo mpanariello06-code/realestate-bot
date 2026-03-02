@@ -25,7 +25,6 @@ def posting_platform_keyboard() -> InlineKeyboardMarkup:
         [
             InlineKeyboardButton("Facebook", callback_data="platform_facebook"),
             InlineKeyboardButton("Instagram", callback_data="platform_instagram"),
-            InlineKeyboardButton("TikTok", callback_data="platform_tiktok"),
         ],
         [
             InlineKeyboardButton("All Platforms", callback_data="platform_all"),

@@ -1,15 +1,17 @@
 """
 Weekly Report Generator
 Compiles performance metrics and sends them to all configured agents
-via Telegram.
+via Telegram – both a text summary and a formatted PDF attachment.
 """
 from __future__ import annotations
 
+import io
 import logging
 from datetime import datetime, timedelta, timezone
 
 import config
 from services.sheets import get_leads, get_performance
+from services.pdf_report import build_report_pdf
 
 logger = logging.getLogger(__name__)
 
@@ -60,21 +62,30 @@ def _build_report_text() -> str:
         f"{platform_section}\n\n"
         f"*🎯 Key Takeaway*\n"
         f"  You have *{n_qualified - n_contacted}* qualified lead(s) still "
-        f"waiting to be contacted. Follow up now to close more deals! 🚀"
+        f"waiting to be contacted. Follow up now to close more deals! 🚀\n\n"
+        f"📎 _A full PDF report is attached below._"
     )
     return report
 
 
 async def send_weekly_report(bot) -> None:
     """
-    Generate the weekly report and send it to all agent chat IDs.
+    Generate the weekly report text + PDF and send both to all agent chat IDs.
 
     Parameters
     ----------
     bot : telegram.Bot
         An initialised python-telegram-bot Bot instance.
     """
+    leads = get_leads()
+    perf_records = get_performance(weeks=1)
+
     report_text = _build_report_text()
+    pdf_bytes = build_report_pdf(leads, perf_records)
+
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    filename = f"weekly_report_{today}.pdf"
+
     for chat_id in config.AGENT_CHAT_IDS:
         try:
             await bot.send_message(
@@ -82,6 +93,12 @@ async def send_weekly_report(bot) -> None:
                 text=report_text,
                 parse_mode="Markdown",
             )
-            logger.info("Weekly report sent to agent %s", chat_id)
+            await bot.send_document(
+                chat_id=chat_id,
+                document=io.BytesIO(pdf_bytes),
+                filename=filename,
+                caption="📋 Full performance report – tap to open or forward to your team.",
+            )
+            logger.info("Weekly report (text + PDF) sent to agent %s", chat_id)
         except Exception as exc:
             logger.error("Failed to send report to %s: %s", chat_id, exc)
