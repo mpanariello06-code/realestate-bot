@@ -22,6 +22,7 @@ from typing import Optional
 
 from telegram import (
     Bot,
+    BotCommand,
     InlineKeyboardButton,
     InlineKeyboardMarkup,
     Message,
@@ -990,8 +991,57 @@ async def _cmd_notes_info(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
 # ── Build Application ─────────────────────────────────────────────────────────
 
+# Commands registered with Telegram so they appear in the "/" menu.
+_BOT_COMMANDS = [
+    BotCommand("start",   "🏠 Show main menu"),
+    BotCommand("post",    "📸 Post a new property listing"),
+    BotCommand("qualify", "🔍 AI-score a lead enquiry"),
+    BotCommand("leads",   "🎯 View qualified leads"),
+    BotCommand("performance", "📊 View performance stats"),
+    BotCommand("report",  "📈 Send weekly report now"),
+    BotCommand("notes",   "📝 Add a note to a lead"),
+    BotCommand("help",    "❓ Show all commands"),
+    BotCommand("myid",    "🪪 Show your Telegram chat ID"),
+]
+
+
+async def _on_startup(app: Application) -> None:
+    """
+    Called automatically by python-telegram-bot once the bot is connected.
+    Registers the command menu and sends a startup welcome to every agent.
+    """
+    # Register "/" command menu in Telegram
+    try:
+        await app.bot.set_my_commands(_BOT_COMMANDS)
+        logger.info("Telegram command menu registered (%d commands).", len(_BOT_COMMANDS))
+    except Exception as exc:
+        logger.warning("Could not set bot commands: %s", exc)
+
+    # Send "bot is online" welcome message to each authorised agent
+    if not config.AGENT_CHAT_IDS:
+        return
+    for chat_id in config.AGENT_CHAT_IDS:
+        try:
+            await app.bot.send_message(
+                chat_id=chat_id,
+                text=(
+                    "🟢 *Real Estate Agent Assistant is Online!*\n\n"
+                    "Your bot is up and ready to go. Tap a button below to get started 👇"
+                ),
+                parse_mode=ParseMode.MARKDOWN,
+                reply_markup=main_menu_keyboard(),
+            )
+        except Exception as exc:
+            logger.warning("Could not send startup message to %s: %s", chat_id, exc)
+
+
 def build_application() -> Application:
-    app = Application.builder().token(config.TELEGRAM_BOT_TOKEN).build()
+    app = (
+        Application.builder()
+        .token(config.TELEGRAM_BOT_TOKEN)
+        .post_init(_on_startup)
+        .build()
+    )
 
     # Post listing conversation
     post_conv = ConversationHandler(

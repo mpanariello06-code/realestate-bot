@@ -455,5 +455,80 @@ class TestKeyboards(unittest.TestCase):
         self.assertEqual(len(buttons), 1)
 
 
+# ── _on_startup ───────────────────────────────────────────────────────────────
+
+class TestOnStartup(unittest.IsolatedAsyncioTestCase):
+
+    async def test_startup_sends_welcome_to_each_agent(self):
+        """_on_startup should send one message per configured agent chat ID."""
+        import config as cfg
+        orig_ids = cfg.AGENT_CHAT_IDS
+        cfg.AGENT_CHAT_IDS = [111, 222]
+        try:
+            from bot.telegram_bot import _on_startup
+            app = MagicMock()
+            app.bot.set_my_commands = AsyncMock()
+            app.bot.send_message = AsyncMock()
+            await _on_startup(app)
+            assert app.bot.send_message.await_count == 2
+            chat_ids_called = [
+                c.kwargs["chat_id"] for c in app.bot.send_message.await_args_list
+            ]
+            self.assertIn(111, chat_ids_called)
+            self.assertIn(222, chat_ids_called)
+        finally:
+            cfg.AGENT_CHAT_IDS = orig_ids
+
+    async def test_startup_registers_command_menu(self):
+        """_on_startup should call set_my_commands with the bot command list."""
+        import config as cfg
+        orig_ids = cfg.AGENT_CHAT_IDS
+        cfg.AGENT_CHAT_IDS = []
+        try:
+            from bot.telegram_bot import _on_startup, _BOT_COMMANDS
+            app = MagicMock()
+            app.bot.set_my_commands = AsyncMock()
+            app.bot.send_message = AsyncMock()
+            await _on_startup(app)
+            app.bot.set_my_commands.assert_awaited_once_with(_BOT_COMMANDS)
+        finally:
+            cfg.AGENT_CHAT_IDS = orig_ids
+
+    async def test_startup_welcome_contains_menu_keyboard(self):
+        """The startup message must include the main menu inline keyboard."""
+        import config as cfg
+        orig_ids = cfg.AGENT_CHAT_IDS
+        cfg.AGENT_CHAT_IDS = [555]
+        try:
+            from bot.telegram_bot import _on_startup
+            from bot.keyboards import main_menu_keyboard
+            app = MagicMock()
+            app.bot.set_my_commands = AsyncMock()
+            app.bot.send_message = AsyncMock()
+            await _on_startup(app)
+            kwargs = app.bot.send_message.await_args_list[0].kwargs
+            self.assertEqual(
+                kwargs["reply_markup"].inline_keyboard,
+                main_menu_keyboard().inline_keyboard,
+            )
+        finally:
+            cfg.AGENT_CHAT_IDS = orig_ids
+
+    async def test_startup_skips_send_when_no_agent_ids(self):
+        """If AGENT_CHAT_IDS is empty, no messages should be sent."""
+        import config as cfg
+        orig_ids = cfg.AGENT_CHAT_IDS
+        cfg.AGENT_CHAT_IDS = []
+        try:
+            from bot.telegram_bot import _on_startup
+            app = MagicMock()
+            app.bot.set_my_commands = AsyncMock()
+            app.bot.send_message = AsyncMock()
+            await _on_startup(app)
+            app.bot.send_message.assert_not_awaited()
+        finally:
+            cfg.AGENT_CHAT_IDS = orig_ids
+
+
 if __name__ == "__main__":
     unittest.main()
