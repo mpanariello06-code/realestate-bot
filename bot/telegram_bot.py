@@ -125,18 +125,28 @@ async def _agent_only(update: Update, context: ContextTypes.DEFAULT_TYPE) -> boo
 # ── /start ────────────────────────────────────────────────────────────────────
 
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    if not await _agent_only(update, context):
+    global _bot_paused
+    if not _is_agent(update):
+        if update.effective_message:
+            await update.effective_message.reply_text(
+                "⛔ You are not authorised to use this bot.\n\n"
+                "To get access, send /myid to this bot to find your Telegram "
+                "chat ID, then add it to the AGENT_CHAT_IDS line in your .env "
+                "file and restart the bot."
+            )
         return
+    _bot_paused = False
     await update.effective_message.reply_text(
-        "👋 *Welcome to the Real Estate Agent Bot!*\n\n"
-        "I help you:\n"
-        "• 📸 Post listings to Facebook & Instagram via GHL Social Planner\n"
-        "• 🔍 Qualify and track leads with AI\n"
-        "• 📊 Monitor your performance\n"
-        "• 📈 Get weekly reports\n"
-        "• 🔗 Manage Go High Level auto-DM replies\n\n"
-        "Tap a button below or type /help for a full command list.\n"
-        "Use *⏹ Stop Bot* to pause all functions.",
+        "🏠 *Real Estate Agent Assistant*\n\n"
+        "Welcome! Here's what I can do for you:\n\n"
+        "📸 *Post Listing* — Publish a property to social media\n"
+        "🔍 *Qualify Lead* — Score & analyse enquiries with AI\n"
+        "🎯 *Qualified Leads* — View your top leads\n"
+        "📋 *All Leads* — Browse your full leads list\n"
+        "📊 *Performance* — Track your key metrics\n"
+        "📈 *Weekly Report* — Get a detailed performance summary\n"
+        "⚙️ *Integrations* — Check your connection status\n\n"
+        "Tap a button below to get started 👇",
         parse_mode=ParseMode.MARKDOWN,
         reply_markup=main_menu_keyboard(),
     )
@@ -148,20 +158,23 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not await _agent_only(update, context):
         return
     await update.effective_message.reply_text(
-        "*Available Commands*\n\n"
-        "/start – Main menu\n"
-        "/post – Post a new property listing via GHL Social Planner\n"
-        "/qualify – Paste a lead message to get an instant AI score & follow-up questions\n"
-        "/leads – View qualified leads\n"
-        "/notes – Add a note to a lead (e.g. `/notes 3 Viewing Saturday 2pm`)\n"
-        "/performance – View performance stats\n"
-        "/report – Send the weekly report now\n"
-        "/ghl – Go High Level integration status & setup guide\n"
-        "/stopbot – Pause the bot (disable all functions)\n"
-        "/startbot – Resume the bot after pausing\n"
-        "/myid – Show your Telegram chat ID (useful for setup)\n"
-        "/help – This help message",
+        "📖 *Available Commands*\n\n"
+        "/start — Show main menu\n"
+        "/post — Post a new property listing\n"
+        "/qualify — AI-score an enquiry message\n"
+        "/leads — View qualified leads\n"
+        "/notes — Add a note to a lead\n"
+        "  _e.g._ `/notes 3 Viewing Saturday 2pm`\n"
+        "/performance — View performance stats\n"
+        "/report — Send the weekly report now\n"
+        "/ghl — CRM integration status\n"
+        "/stopbot — Pause the bot\n"
+        "/startbot — Resume the bot\n"
+        "/myid — Show your Telegram chat ID\n"
+        "/help — This help message\n\n"
+        "💡 Tip: Use the buttons below for quick access.",
         parse_mode=ParseMode.MARKDOWN,
+        reply_markup=main_menu_keyboard(),
     )
 
 
@@ -444,66 +457,40 @@ async def cmd_ghl(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 async def cmd_zapier(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """
-    Show the current Zapier integration status and quick-start guide.
+    Show the current automation integration status.
     """
     if not await _agent_only(update, context):
         return
 
     configured = zapier_service.is_configured()
-    status = "✅ Webhook URL configured" if configured else "❌ Not configured"
+    status = "✅ Connected" if configured else "❌ Not connected"
 
     lines = [
-        "*📡 Zapier Integration*\n",
-        f"Status: {status}",
+        "*⚙️ Integration Status*\n",
+        f"Social Media Automation: {status}",
     ]
 
     if configured:
         cloudinary_ok = cloudinary_upload.is_configured()
-        cloudinary_status = "✅ Cloudinary configured" if cloudinary_ok else "⚠️ Cloudinary not set (no image_url)"
-        lines.append(f"Cloudinary: {cloudinary_status}")
+        image_status = "✅ Image hosting configured" if cloudinary_ok else "⚠️ Image hosting not set up (posts will have no image)"
+        lines.append(f"Image Hosting: {image_status}")
         lines.append(
             "\n*How it works:*\n"
             "When you tap *Post Listing*, the bot:\n"
             "1️⃣ Collects listing details (price, location, bedrooms, bathrooms, phone)\n"
-            "2️⃣ Uploads the photo to Cloudinary to get a public URL\n"
-            "3️⃣ Sends structured JSON to Zapier:\n"
-            "```\n"
-            "{\n"
-            '  "description":   "...",\n'
-            '  "price":         "...",\n'
-            '  "location":      "...",\n'
-            '  "bedrooms":      "...",\n'
-            '  "bathrooms":     "...",\n'
-            '  "contact_phone": "...",\n'
-            '  "image_url":     "https://res.cloudinary.com/..."\n'
-            "}\n"
-            "```\n"
-            "Zapier then publishes to Facebook & Instagram automatically."
+            "2️⃣ Uploads the photo to get a public URL\n"
+            "3️⃣ Publishes to Facebook & Instagram automatically."
         )
     else:
         lines.append(
-            "\n*Setup Steps:*\n"
-            "1️⃣ In Zapier, create a new Zap:\n"
-            "   Trigger: *Webhooks by Zapier → Catch Hook*\n"
-            "   Copy the generated webhook URL.\n\n"
-            "2️⃣ Add your posting actions, e.g.:\n"
-            "   Action 1: *Facebook Pages → Create Page Post*\n"
-            "   Map `description` + `price` to the post body.\n"
-            "   Action 2: *Instagram for Business → Create Photo Post*\n"
-            "   Map `image_url` to the Photo, `description` to the Caption.\n\n"
-            "3️⃣ Set up Cloudinary (for photo uploads):\n"
-            "   Register free at cloudinary.com, then add to `.env`:\n"
-            "   `CLOUDINARY_CLOUD_NAME=...`\n"
-            "   `CLOUDINARY_API_KEY=...`\n"
-            "   `CLOUDINARY_API_SECRET=...`\n\n"
-            "4️⃣ Add to your `.env` file:\n"
-            "   `ZAPIER_WEBHOOK_URL=https://hooks.zapier.com/hooks/catch/...`\n\n"
-            "5️⃣ Restart the bot and run `/zapier` again to confirm."
+            "\n⚠️ Social media automation is not configured.\n"
+            "Please contact your administrator to set up the integration."
         )
 
     await update.effective_message.reply_text(
         "\n".join(lines),
         parse_mode=ParseMode.MARKDOWN,
+        reply_markup=main_menu_keyboard(),
     )
 
 
@@ -513,9 +500,9 @@ async def cmd_post(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     if not await _agent_only(update, context):
         return ConversationHandler.END
     if zapier_service.is_configured():
-        channel_note = "Your post will be published via *Zapier* (Facebook & Instagram)."
+        channel_note = "Your post will be published to *Facebook & Instagram* automatically."
     elif ghl_service.is_configured():
-        channel_note = "Your post will be published via *GHL Social Planner* (Facebook & Instagram)."
+        channel_note = "Your post will be published to *Facebook & Instagram* via the Social Planner."
     else:
         channel_note = "You will choose the target platform after confirming the caption."
     await update.effective_message.reply_text(
@@ -638,7 +625,7 @@ async def handle_contact_phone(update: Update, context: ContextTypes.DEFAULT_TYP
         f"🛏 *Bedrooms:* {context.user_data.get(CTX_BEDROOMS, '—')}\n"
         f"🚿 *Bathrooms:* {context.user_data.get(CTX_BATHROOMS, '—')}\n"
         f"📞 *Phone:* {context.user_data.get(CTX_CONTACT_PHONE, '—')}\n\n"
-        "Confirm to post this to Facebook & Instagram via Zapier:"
+        "Confirm to publish this listing to Facebook & Instagram:"
     )
     await update.effective_message.reply_text(
         summary,
@@ -675,8 +662,8 @@ async def handle_confirm_callback(update: Update, context: ContextTypes.DEFAULT_
     if query.data == "confirm_post":
         # ── Zapier path (preferred) ───────────────────────────────────────────
         if zapier_service.is_configured():
-            await query.answer("🚀 Sending to Zapier…")
-            await query.edit_message_text("🚀 Uploading photo & sending to Zapier…")
+            await query.answer("🚀 Publishing listing…")
+            await query.edit_message_text("🚀 Uploading photo and publishing your listing…")
 
             image_path = context.user_data.get(CTX_MEDIA_PATH)
             media_type = context.user_data.get(CTX_MEDIA_TYPE, "photo")
@@ -687,22 +674,13 @@ async def handle_confirm_callback(update: Update, context: ContextTypes.DEFAULT_
                 uploaded_url = cloudinary_upload.upload_image(image_path)
                 if uploaded_url:
                     image_url = uploaded_url
-                    # Echo the public URL back to the agent so they can see it
-                    await context.bot.send_message(
-                        chat_id=update.effective_chat.id,
-                        text=(
-                            f"🖼 *Photo uploaded to Cloudinary!*\n\n"
-                            f"Public URL:\n`{image_url}`"
-                        ),
-                        parse_mode=ParseMode.MARKDOWN,
-                    )
                 elif not cloudinary_upload.is_configured():
                     await context.bot.send_message(
                         chat_id=update.effective_chat.id,
                         text=(
-                            "⚠️ Cloudinary is not configured – no image URL will be "
-                            "included in the Zapier payload. Instagram posting requires "
-                            "a public image URL; set CLOUDINARY_* in .env to enable it."
+                            "⚠️ Image hosting is not configured — the post will be "
+                            "published without an image. Instagram posts require an image; "
+                            "please contact your administrator to enable image hosting."
                         ),
                     )
                 else:
@@ -710,8 +688,8 @@ async def handle_confirm_callback(update: Update, context: ContextTypes.DEFAULT_
                     await context.bot.send_message(
                         chat_id=update.effective_chat.id,
                         text=(
-                            "⚠️ Photo upload to Cloudinary failed. Posting without image. "
-                            "Instagram posting via Zapier will be skipped."
+                            "⚠️ Photo upload failed. Publishing without image. "
+                            "Instagram posting will be skipped."
                         ),
                     )
 
@@ -735,9 +713,9 @@ async def handle_confirm_callback(update: Update, context: ContextTypes.DEFAULT_
 
             res = zapier_service.post_listing(listing)
             result_text = (
-                "✅ Zapier: Post sent! Zapier will publish it to Facebook & Instagram."
+                "✅ Post sent successfully! Your listing will be published to Facebook & Instagram."
                 if res.get("success")
-                else f"❌ Zapier: {res.get('error', 'Unknown error')}"
+                else f"❌ Could not publish listing: {res.get('error', 'Unknown error')}"
             )
             _cleanup_media(context)
             await context.bot.send_message(
@@ -922,7 +900,7 @@ _MENU_TOASTS: dict[str, str] = {
     "all_leads":       "📋 Loading all leads…",
     "performance":     "📊 Loading performance…",
     "weekly_report":   "📈 Generating report…",
-    "zapier_status":   "📡 Loading Zapier status…",
+    "zapier_status":   "⚙️ Loading integrations…",
     "ghl_status":      "🔗 Loading GHL status…",
     "notes_info":      "📝 Opening notes guide…",
     "help":            "❓ Loading help…",

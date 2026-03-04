@@ -23,7 +23,7 @@ def main_menu_keyboard() -> InlineKeyboardMarkup:
             InlineKeyboardButton("📈 Weekly Report", callback_data="weekly_report"),
         ],
         [
-            InlineKeyboardButton("📡 Zapier", callback_data="zapier_status"),
+            InlineKeyboardButton("⚙️ Integrations", callback_data="zapier_status"),
             InlineKeyboardButton("📝 Notes Help", callback_data="notes_info"),
         ],
         [
