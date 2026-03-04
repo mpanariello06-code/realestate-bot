@@ -17,7 +17,7 @@ from services import zapier as zapier_service
 
 logger = logging.getLogger(__name__)
 
-FACEBOOK_GRAPH_URL = "https://graph.facebook.com/v19.0"
+FACEBOOK_GRAPH_URL = "https://graph.facebook.com/v22.0"
 
 
 # ── Facebook ──────────────────────────────────────────────────────────────────
