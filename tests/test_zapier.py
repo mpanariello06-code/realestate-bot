@@ -410,6 +410,40 @@ class TestConfirmCallbackZapierPath(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(listing["bedrooms"], "3")
         self.assertEqual(listing["bathrooms"], "2")
         self.assertEqual(listing["contact_phone"], "613-555-1234")
+        # image_url must always be present so Zapier can map it to Instagram's Photo field
+        self.assertIn("image_url", listing)
+
+    async def test_image_url_always_present_in_payload_even_without_photo(self):
+        """image_url must be present (as empty string) even when no photo is uploaded.
+
+        Zapier needs to discover the field during test-trigger setup so that the
+        user can map it to Instagram's required Photo input.  If the key is absent
+        from the payload, Zapier's Instagram action will error with
+        'Photo field is required but not receiving a valid image URL'.
+        """
+        import bot.telegram_bot as tb
+        import config as cfg
+        cfg.ZAPIER_WEBHOOK_URL = "https://hooks.zapier.com/hooks/catch/abc/"
+
+        update = MagicMock()
+        update.effective_chat.id = 123
+        query = AsyncMock()
+        query.data = "confirm_post"
+        update.callback_query = query
+        # No media path – simulates a text-only post (media type is irrelevant here)
+        context = self._make_context({tb.CTX_MEDIA_PATH: None})
+        mock_post = MagicMock(return_value={"success": True, "status_code": 200})
+
+        with patch("bot.telegram_bot.zapier_service.is_configured", return_value=True), \
+             patch("bot.telegram_bot.cloudinary_upload.is_configured", return_value=False), \
+             patch("bot.telegram_bot.zapier_service.post_listing", mock_post):
+            await tb.handle_confirm_callback(update, context)
+
+        listing = mock_post.call_args[0][0]
+        # Key must exist so Zapier can map it
+        self.assertIn("image_url", listing)
+        # Value is empty when no image was uploaded
+        self.assertEqual(listing["image_url"], "")
 
     async def test_cloudinary_url_included_in_payload_when_upload_succeeds(self):
         """When Cloudinary upload succeeds, image_url must appear in the payload."""

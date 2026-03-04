@@ -697,15 +697,27 @@ async def handle_confirm_callback(update: Update, context: ContextTypes.DEFAULT_
                         parse_mode=ParseMode.MARKDOWN,
                     )
                 elif not cloudinary_upload.is_configured():
-                    image_url = ""  # Cloudinary not set up – omit the field
+                    await context.bot.send_message(
+                        chat_id=update.effective_chat.id,
+                        text=(
+                            "⚠️ Cloudinary is not configured – no image URL will be "
+                            "included in the Zapier payload. Instagram posting requires "
+                            "a public image URL; set CLOUDINARY_* in .env to enable it."
+                        ),
+                    )
                 else:
                     # Upload failed – warn but continue
                     await context.bot.send_message(
                         chat_id=update.effective_chat.id,
-                        text="⚠️ Photo upload to Cloudinary failed. Posting without image.",
+                        text=(
+                            "⚠️ Photo upload to Cloudinary failed. Posting without image. "
+                            "Instagram posting via Zapier will be skipped."
+                        ),
                     )
 
-            # Build the structured listing payload
+            # Build the structured listing payload.
+            # image_url is always included (empty string when no image) so that
+            # Zapier can discover and map the field to Instagram's Photo input.
             description = (
                 context.user_data.get(CTX_DESCRIPTION)
                 or context.user_data.get(CTX_CAPTION)
@@ -718,9 +730,8 @@ async def handle_confirm_callback(update: Update, context: ContextTypes.DEFAULT_
                 "bedrooms":      context.user_data.get(CTX_BEDROOMS, ""),
                 "bathrooms":     context.user_data.get(CTX_BATHROOMS, ""),
                 "contact_phone": context.user_data.get(CTX_CONTACT_PHONE, ""),
+                "image_url":     image_url,
             }
-            if image_url:
-                listing["image_url"] = image_url
 
             res = zapier_service.post_listing(listing)
             result_text = (
