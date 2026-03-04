@@ -713,11 +713,14 @@ async def handle_confirm_callback(update: Update, context: ContextTypes.DEFAULT_
             }
 
             res = zapier_service.post_listing(listing)
-            result_text = (
-                "✅ Post sent successfully! Your listing will be published to Facebook & Instagram."
-                if res.get("success")
-                else f"❌ Could not publish listing: {res.get('error', 'Unknown error')}"
-            )
+            if res.get("success"):
+                url_line = f"\n🔗 Image URL: {image_url}" if image_url else ""
+                result_text = (
+                    "✅ Post sent successfully! Your listing will be published to Facebook & Instagram."
+                    + url_line
+                )
+            else:
+                result_text = f"❌ Could not publish listing: {res.get('error', 'Unknown error')}"
             _cleanup_media(context)
             await context.bot.send_message(
                 chat_id=update.effective_chat.id,
@@ -738,11 +741,11 @@ async def handle_confirm_callback(update: Update, context: ContextTypes.DEFAULT_
                 caption,
                 image_path if media_type == "photo" else None,
             )
-            result_text = (
-                f"✅ GHL: Post published! (id: {res.get('post_id', '—')})"
-                if res.get("success")
-                else f"❌ GHL: {res.get('error', 'Unknown error')}"
-            )
+            if res.get("success"):
+                post_id = res.get("post_id", "—")
+                result_text = f"✅ GHL: Post published! (id: {post_id})"
+            else:
+                result_text = f"❌ GHL: {res.get('error', 'Unknown error')}"
             _cleanup_media(context)
             await context.bot.send_message(
                 chat_id=update.effective_chat.id,
@@ -792,24 +795,35 @@ async def handle_platform_callback(update: Update, context: ContextTypes.DEFAULT
         lines = []
         for plat, res in results.items():
             icon = "✅" if res.get("success") else "❌"
-            lines.append(f"{icon} {plat.title()}: {res.get('post_id') or res.get('error', '')}")
+            post_id = res.get("post_id") or ""
+            if res.get("success") and post_id:
+                if plat == "facebook":
+                    lines.append(
+                        f"{icon} {plat.title()}: {post_id}\n"
+                        f"🔗 https://www.facebook.com/{post_id}"
+                    )
+                else:
+                    lines.append(f"{icon} {plat.title()}: {post_id}")
+            else:
+                lines.append(f"{icon} {plat.title()}: {post_id or res.get('error', '')}")
         result_text = "\n".join(lines)
     elif platform == "facebook":
         res = social_poster.post_to_facebook(
             caption, image_path if media_type == "photo" else None
         )
-        result_text = (
-            f"✅ Facebook: {res.get('post_id', '')}"
-            if res.get("success")
-            else f"❌ Facebook: {res.get('error', '')}"
-        )
+        if res.get("success"):
+            post_id = res.get("post_id", "")
+            url_line = f"\n🔗 https://www.facebook.com/{post_id}" if post_id else ""
+            result_text = f"✅ Facebook: {post_id}{url_line}"
+        else:
+            result_text = f"❌ Facebook: {res.get('error', '')}"
     elif platform == "instagram":
         res = social_poster.post_to_instagram(caption, image_path or "")
-        result_text = (
-            f"✅ Instagram: {res.get('post_id', '')}"
-            if res.get("success")
-            else f"❌ Instagram: {res.get('error', '')}"
-        )
+        if res.get("success"):
+            post_id = res.get("post_id", "")
+            result_text = f"✅ Instagram: {post_id}"
+        else:
+            result_text = f"❌ Instagram: {res.get('error', '')}"
     else:
         result_text = "❌ Unknown platform or missing media."
 
