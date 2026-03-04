@@ -21,6 +21,7 @@ _REQUIRED = {
     "flask": "flask",
     "dotenv": "python-dotenv",
     "requests": "requests",
+    "cloudinary": "cloudinary",
 }
 
 def _check_dependencies() -> None:

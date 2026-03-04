@@ -16,8 +16,13 @@ from __future__ import annotations
 import logging
 from typing import Optional
 
-import cloudinary
-import cloudinary.uploader
+try:
+    import cloudinary
+    import cloudinary.uploader
+    _CLOUDINARY_AVAILABLE = True
+except ImportError:
+    cloudinary = None  # type: ignore[assignment]
+    _CLOUDINARY_AVAILABLE = False
 
 import config
 
@@ -35,6 +40,8 @@ def is_configured() -> bool:
 
 def _configure() -> None:
     """Apply Cloudinary credentials from config (called lazily before upload)."""
+    if not _CLOUDINARY_AVAILABLE:
+        return
     cloudinary.config(
         cloud_name=config.CLOUDINARY_CLOUD_NAME,
         api_key=config.CLOUDINARY_API_KEY,
@@ -50,6 +57,9 @@ def upload_image(file_path: str) -> Optional[str]:
     Returns the ``https://res.cloudinary.com/…`` URL on success,
     or ``None`` if Cloudinary is not configured or the upload fails.
     """
+    if not _CLOUDINARY_AVAILABLE:
+        logger.warning("cloudinary package is not installed – skipping upload.")
+        return None
     if not is_configured():
         logger.warning("Cloudinary credentials not configured – skipping upload.")
         return None
