@@ -28,11 +28,26 @@ def main_menu_keyboard() -> InlineKeyboardMarkup:
         ],
         [
             InlineKeyboardButton("❓ Help", callback_data="help"),
+            InlineKeyboardButton("⏹ Stop Bot", callback_data="stop_bot"),
+        ],
+    ])
+
+
+def start_bot_keyboard() -> InlineKeyboardMarkup:
+    """Shown when the bot is paused – only the Start Bot button is active."""
+    return InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("▶️ Start Bot", callback_data="start_bot"),
         ],
     ])
 
 
 def posting_platform_keyboard() -> InlineKeyboardMarkup:
+    """
+    Fallback platform keyboard – only shown when GHL is NOT configured.
+    When GHL is configured, posts go directly via GHL Social Planner and
+    this keyboard is never displayed.
+    """
     return InlineKeyboardMarkup([
         [
             InlineKeyboardButton("📘 Facebook", callback_data="platform_facebook"),

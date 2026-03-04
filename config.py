@@ -84,3 +84,7 @@ GHL_AUTO_REPLY_MESSAGE: str = os.getenv(
     "One of our agents will be in touch with you shortly. "
     "In the meantime, feel free to ask any questions!",
 )
+# Comma-separated list of GHL Social Planner account IDs to post to.
+# Leave blank to auto-discover all connected accounts for the location.
+# Example: "abc123,def456"
+GHL_SOCIAL_ACCOUNT_IDS: str = os.getenv("GHL_SOCIAL_ACCOUNT_IDS", "")

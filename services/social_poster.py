@@ -1,7 +1,8 @@
 """
 Social Media Poster
-Posts property listings (photos/videos + caption) to Facebook and
-Instagram using their respective APIs.
+Posts property listings (photos/videos + caption) via Go High Level's
+Social Planner API.  Direct Facebook/Instagram Graph API calls are kept
+as a fallback for environments where GHL is not configured.
 """
 from __future__ import annotations
 
@@ -11,6 +12,7 @@ from pathlib import Path
 import requests
 
 import config
+from services import ghl as ghl_service
 
 logger = logging.getLogger(__name__)
 
@@ -172,10 +174,21 @@ def post_listing(
     video_path: str | None = None,
 ) -> dict[str, dict]:
     """
-    Post a property listing to all configured platforms (Facebook & Instagram).
+    Post a property listing to all configured social platforms.
+
+    When GHL is configured the listing is published via GHL's Social Planner
+    (which handles Facebook and Instagram automatically).  If GHL is not
+    configured the function falls back to direct Facebook/Instagram API calls.
 
     Returns a dict mapping platform name → result dict.
     """
+    # ── GHL Social Planner path (recommended) ─────────────────────────────────
+    if ghl_service.is_configured():
+        media = image_path or video_path
+        result = ghl_service.post_to_social_planner(caption, media)
+        return {"ghl": result}
+
+    # ── Direct API fallback ────────────────────────────────────────────────────
     results: dict[str, dict] = {}
 
     results["facebook"] = post_to_facebook(caption, image_path)

@@ -1,7 +1,7 @@
 """
 Go High Level (GHL) API Client
-Handles contact look-ups, conversation creation, and outbound DM sending
-via the GHL v2 REST API.
+Handles contact look-ups, conversation creation, outbound DM sending,
+and Social Planner posting via the GHL v2 REST API.
 
 GHL API base: https://services.leadconnectorhq.com
 Docs:         https://highlevel.stoplight.io/docs/integrations/
@@ -15,6 +15,7 @@ GHL_LOCATION_ID   – The sub-account / Location ID the bot operates under.
 from __future__ import annotations
 
 import logging
+import os
 from typing import Optional
 
 import requests
@@ -203,4 +204,139 @@ def send_dm_to_conversation(conversation_id: str, message: str, message_type: st
         return {"success": True, "messageId": message_id}
     except requests.RequestException as exc:
         logger.error("GHL send_dm_to_conversation(%s) failed: %s", conversation_id, exc)
+        return {"success": False, "error": str(exc)}
+
+
+# ── Social Planner ────────────────────────────────────────────────────────────
+
+def upload_media(file_path: str) -> Optional[str]:
+    """
+    Upload a local image or video file to GHL media storage.
+
+    Returns the public CDN URL on success, or None on failure.
+    """
+    if not is_configured():
+        logger.warning("GHL credentials not configured – skipping upload_media.")
+        return None
+    try:
+        headers = {
+            "Authorization": f"Bearer {config.GHL_API_KEY}",
+            "Version": GHL_API_VERSION,
+        }
+        with open(file_path, "rb") as f:
+            resp = requests.post(
+                f"{GHL_BASE_URL}/medias/upload-file",
+                headers=headers,
+                files={"file": (os.path.basename(file_path), f)},
+                timeout=60,
+            )
+        resp.raise_for_status()
+        data = resp.json()
+        url = data.get("url") or data.get("fileUrl", "")
+        logger.info("GHL media uploaded: %s", url)
+        return url or None
+    except Exception as exc:
+        logger.error("GHL media upload failed: %s", exc)
+        return None
+
+
+def get_social_accounts() -> list:
+    """
+    Return all social media accounts connected to this GHL location.
+
+    Each entry has at least 'accountId' and 'type' keys (e.g. 'facebook',
+    'instagram').  Returns an empty list when GHL is not configured or the
+    request fails.
+    """
+    if not is_configured():
+        return []
+    try:
+        resp = requests.get(
+            f"{GHL_BASE_URL}/social-media-posting/{config.GHL_LOCATION_ID}/accounts",
+            headers=_headers(),
+            timeout=15,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        accounts = data.get("accounts", data if isinstance(data, list) else [])
+        return accounts
+    except requests.RequestException as exc:
+        logger.error("GHL get_social_accounts failed: %s", exc)
+        return []
+
+
+def post_to_social_planner(
+    caption: str,
+    image_path: Optional[str] = None,
+) -> dict:
+    """
+    Publish a post via GHL Social Planner to all connected Facebook and
+    Instagram accounts for this location.
+
+    If *image_path* is provided, the image is uploaded to GHL's CDN first
+    and attached to the post.  Text-only posts work without an image.
+
+    If ``GHL_SOCIAL_ACCOUNT_IDS`` is set in the environment, only those
+    accounts are targeted; otherwise all connected accounts are used.
+
+    Returns a dict with 'success' bool and 'post_id' or 'error'.
+    """
+    if not is_configured():
+        return {"success": False, "error": "GHL credentials not configured"}
+
+    try:
+        payload: dict = {
+            "summary": caption,
+            "status": "PUBLISHED",
+        }
+
+        # Upload media if a local file is supplied
+        if image_path and os.path.exists(image_path):
+            media_url = upload_media(image_path)
+            if media_url:
+                payload["media"] = [{"url": media_url, "type": "photo"}]
+
+        # Resolve target accounts
+        configured_ids = [
+            aid.strip()
+            for aid in config.GHL_SOCIAL_ACCOUNT_IDS.split(",")
+            if aid.strip()
+        ]
+        if configured_ids:
+            # User pre-configured specific account IDs.
+            # Supports an optional type prefix: "fb:<id>" or "ig:<id>".
+            # Without a prefix the ID is treated as a Facebook account.
+            def _parse_account(raw: str) -> dict:
+                if raw.startswith("fb:"):
+                    return {"accountId": raw[3:], "type": "facebook"}
+                if raw.startswith("ig:"):
+                    return {"accountId": raw[3:], "type": "instagram"}
+                return {"accountId": raw, "type": "facebook"}
+
+            payload["accounts"] = [_parse_account(aid) for aid in configured_ids]
+        else:
+            # Auto-discover all connected accounts
+            accounts = get_social_accounts()
+            if accounts:
+                payload["accounts"] = [
+                    {
+                        "accountId": a.get("accountId") or a.get("id", ""),
+                        "type": a.get("type") or a.get("platform", "facebook"),
+                    }
+                    for a in accounts
+                ]
+
+        resp = requests.post(
+            f"{GHL_BASE_URL}/social-media-posting/{config.GHL_LOCATION_ID}/posts",
+            headers=_headers(),
+            json=payload,
+            timeout=30,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        post_id = data.get("id") or data.get("postId", "")
+        logger.info("GHL Social Planner post created: %s", post_id)
+        return {"success": True, "post_id": post_id}
+    except requests.RequestException as exc:
+        logger.error("GHL Social Planner post failed: %s", exc)
         return {"success": False, "error": str(exc)}

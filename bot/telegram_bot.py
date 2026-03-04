@@ -45,12 +45,17 @@ from bot.keyboards import (
     main_menu_keyboard,
     posting_platform_keyboard,
     qualify_action_keyboard,
+    start_bot_keyboard,
 )
 from services import lead_qualifier, sheets, social_poster
 from services.weekly_report import send_weekly_report
 from services import ghl as ghl_service
 
 logger = logging.getLogger(__name__)
+
+# Whether the bot is paused (Stop Bot was pressed).
+# When True every agent-only command/callback returns a paused message.
+_bot_paused: bool = False
 
 # Conversation states
 (
@@ -83,7 +88,16 @@ def _is_agent(update: Update) -> bool:
 
 
 async def _agent_only(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
-    """Send a rejection message and return False if not an agent."""
+    """Return False (and send a message) if not an agent or bot is paused."""
+    if _bot_paused:
+        if update.effective_message:
+            await update.effective_message.reply_text(
+                "⏹ *Bot is paused.*\n\n"
+                "Tap the button below to resume.",
+                parse_mode=ParseMode.MARKDOWN,
+                reply_markup=start_bot_keyboard(),
+            )
+        return False
     if not _is_agent(update):
         if update.effective_message:
             await update.effective_message.reply_text(
@@ -104,12 +118,13 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.effective_message.reply_text(
         "👋 *Welcome to the Real Estate Agent Bot!*\n\n"
         "I help you:\n"
-        "• 📸 Post listings to Facebook & Instagram via GHL\n"
+        "• 📸 Post listings to Facebook & Instagram via GHL Social Planner\n"
         "• 🔍 Qualify and track leads with AI\n"
         "• 📊 Monitor your performance\n"
         "• 📈 Get weekly reports\n"
         "• 🔗 Manage Go High Level auto-DM replies\n\n"
-        "Tap a button below or type /help for a full command list.",
+        "Tap a button below or type /help for a full command list.\n"
+        "Use *⏹ Stop Bot* to pause all functions.",
         parse_mode=ParseMode.MARKDOWN,
         reply_markup=main_menu_keyboard(),
     )
@@ -123,13 +138,15 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.effective_message.reply_text(
         "*Available Commands*\n\n"
         "/start – Main menu\n"
-        "/post – Post a new property listing\n"
+        "/post – Post a new property listing via GHL Social Planner\n"
         "/qualify – Paste a lead message to get an instant AI score & follow-up questions\n"
         "/leads – View qualified leads\n"
         "/notes – Add a note to a lead (e.g. `/notes 3 Viewing Saturday 2pm`)\n"
         "/performance – View performance stats\n"
         "/report – Send the weekly report now\n"
         "/ghl – Go High Level integration status & setup guide\n"
+        "/stopbot – Pause the bot (disable all functions)\n"
+        "/startbot – Resume the bot after pausing\n"
         "/myid – Show your Telegram chat ID (useful for setup)\n"
         "/help – This help message",
         parse_mode=ParseMode.MARKDOWN,
@@ -416,10 +433,18 @@ async def cmd_ghl(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 async def cmd_post(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     if not await _agent_only(update, context):
         return ConversationHandler.END
+    via_ghl = ghl_service.is_configured()
+    channel_note = (
+        "Your post will be published via *GHL Social Planner* "
+        "(Facebook & Instagram)."
+        if via_ghl
+        else "You will choose the target platform after confirming the caption."
+    )
     await update.effective_message.reply_text(
         "📸 *New Listing Post*\n\n"
         "Please send me a *photo or video* of the property, "
-        "or send a text description if you have no media.",
+        "or send a text description if you have no media.\n\n"
+        + channel_note,
         parse_mode=ParseMode.MARKDOWN,
     )
     return AWAITING_MEDIA
@@ -497,6 +522,32 @@ async def handle_confirm_callback(update: Update, context: ContextTypes.DEFAULT_
         return AWAITING_CAPTION_EDIT
 
     if query.data == "confirm_post":
+        # ── GHL path: post directly, no platform selection needed ─────────
+        if ghl_service.is_configured():
+            await query.answer("🚀 Posting via GHL Social Planner…")
+            caption = context.user_data.get(CTX_CAPTION, "")
+            image_path = context.user_data.get(CTX_MEDIA_PATH)
+            media_type = context.user_data.get(CTX_MEDIA_TYPE, "photo")
+            await query.edit_message_text("🚀 Posting via GHL Social Planner…")
+            res = ghl_service.post_to_social_planner(
+                caption,
+                image_path if media_type == "photo" else None,
+            )
+            result_text = (
+                f"✅ GHL: Post published! (id: {res.get('post_id', '—')})"
+                if res.get("success")
+                else f"❌ GHL: {res.get('error', 'Unknown error')}"
+            )
+            _cleanup_media(context)
+            await context.bot.send_message(
+                chat_id=update.effective_chat.id,
+                text=f"*Post Results:*\n{result_text}",
+                parse_mode=ParseMode.MARKDOWN,
+                reply_markup=main_menu_keyboard(),
+            )
+            return ConversationHandler.END
+
+        # ── Fallback: let agent choose platform (direct API) ───────────────
         await query.answer("📱 Choosing platform…")
         await query.edit_message_text(
             "📱 Select which platform(s) to post to:",
@@ -599,6 +650,37 @@ async def handle_lead_action(update: Update, context: ContextTypes.DEFAULT_TYPE)
     )
 
 
+# ── Stop / Start Bot ─────────────────────────────────────────────────────────
+
+async def cmd_stop_bot(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Pause the bot – all agent-only commands will return a paused message."""
+    global _bot_paused
+    if not _is_agent(update):
+        return
+    _bot_paused = True
+    await update.effective_message.reply_text(
+        "⏹ *Bot Paused*\n\n"
+        "All bot functions are now disabled.\n"
+        "Tap *▶️ Start Bot* below to resume.",
+        parse_mode=ParseMode.MARKDOWN,
+        reply_markup=start_bot_keyboard(),
+    )
+
+
+async def cmd_start_bot(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Resume the bot after it has been paused."""
+    global _bot_paused
+    if not _is_agent(update):
+        return
+    _bot_paused = False
+    await update.effective_message.reply_text(
+        "✅ *Bot is Running!*\n\n"
+        "All functions are active. How can I help?",
+        parse_mode=ParseMode.MARKDOWN,
+        reply_markup=main_menu_keyboard(),
+    )
+
+
 # ── Main menu callback ────────────────────────────────────────────────────────
 
 # Toast messages shown instantly when a menu button is tapped
@@ -612,11 +694,53 @@ _MENU_TOASTS: dict[str, str] = {
     "ghl_status":      "🔗 Loading GHL status…",
     "notes_info":      "📝 Opening notes guide…",
     "help":            "❓ Loading help…",
+    "stop_bot":        "⏹ Pausing bot…",
+    "start_bot":       "▶️ Starting bot…",
 }
 
 
 async def handle_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    global _bot_paused
     query = update.callback_query
+
+    # ── start_bot: must work even while paused ─────────────────────────────
+    if query.data == "start_bot":
+        if _is_agent(update):
+            _bot_paused = False
+            await query.answer("▶️ Bot started!")
+            await query.edit_message_text(
+                "✅ *Bot is Running!*\n\nAll functions are active. How can I help?",
+                parse_mode=ParseMode.MARKDOWN,
+                reply_markup=main_menu_keyboard(),
+            )
+        else:
+            await query.answer()
+        return
+
+    # ── stop_bot ──────────────────────────────────────────────────────────
+    if query.data == "stop_bot":
+        if _is_agent(update):
+            _bot_paused = True
+            await query.answer("⏹ Bot paused")
+            await query.edit_message_text(
+                "⏹ *Bot Paused*\n\nTap *▶️ Start Bot* to resume.",
+                parse_mode=ParseMode.MARKDOWN,
+                reply_markup=start_bot_keyboard(),
+            )
+        else:
+            await query.answer()
+        return
+
+    # ── All other callbacks: blocked when paused ──────────────────────────
+    if _bot_paused:
+        await query.answer("⏹ Bot is paused")
+        await query.edit_message_text(
+            "⏹ *Bot is paused.*\n\nTap the button below to resume.",
+            parse_mode=ParseMode.MARKDOWN,
+            reply_markup=start_bot_keyboard(),
+        )
+        return
+
     toast = _MENU_TOASTS.get(query.data, "Loading…")
     await query.answer(toast)
 
@@ -725,6 +849,8 @@ def build_application() -> Application:
     app.add_handler(CommandHandler("report", cmd_report))
     app.add_handler(CommandHandler("notes", cmd_notes))
     app.add_handler(CommandHandler("ghl", cmd_ghl))
+    app.add_handler(CommandHandler("stopbot", cmd_stop_bot))
+    app.add_handler(CommandHandler("startbot", cmd_start_bot))
 
     # Callback query handlers
     app.add_handler(
@@ -733,7 +859,7 @@ def build_application() -> Application:
     app.add_handler(
         CallbackQueryHandler(
             handle_menu_callback,
-            pattern="^(qualify_lead|performance|qualified_leads|all_leads|weekly_report|ghl_status|notes_info|help)$",
+            pattern="^(qualify_lead|performance|qualified_leads|all_leads|weekly_report|ghl_status|notes_info|help|stop_bot|start_bot)$",
         )
     )
 
