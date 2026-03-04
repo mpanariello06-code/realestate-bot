@@ -27,11 +27,116 @@ logger = logging.getLogger(__name__)
 GHL_BASE_URL = "https://services.leadconnectorhq.com"
 GHL_API_VERSION = "2021-07-28"
 
+# ── Token management ──────────────────────────────────────────────────────────
+
+# Holds a refreshed access token when auto-refresh has succeeded.
+# Falls back to config.GHL_API_KEY when empty.
+_access_token: str = ""
+
+_AUTH_HELP = (
+    "GHL API key is invalid or expired (401 Unauthorized). "
+    "Please regenerate your Private Integration key in "
+    "GHL → Settings → Integrations → Private Integrations "
+    "and update GHL_API_KEY in your .env file. "
+    "To enable automatic token refresh, also set "
+    "GHL_CLIENT_ID, GHL_CLIENT_SECRET and GHL_REFRESH_TOKEN in .env."
+)
+
+
+def _current_token() -> str:
+    """Return the active access token (refreshed or configured)."""
+    return _access_token or config.GHL_API_KEY
+
+
+def _is_auth_error(exc: requests.RequestException) -> bool:
+    """Return True if *exc* is a 401 Unauthorized HTTP error."""
+    response = getattr(exc, "response", None)
+    return response is not None and response.status_code == 401
+
+
+def _can_refresh() -> bool:
+    """Return True if OAuth2 refresh credentials are configured."""
+    return bool(
+        config.GHL_CLIENT_ID
+        and config.GHL_CLIENT_SECRET
+        and config.GHL_REFRESH_TOKEN
+    )
+
+
+def _refresh_access_token() -> bool:
+    """
+    Refresh the GHL access token using the stored OAuth2 refresh token.
+
+    Updates the module-level ``_access_token`` on success.
+    Returns True if a new token was obtained, False otherwise.
+    """
+    global _access_token
+    if not _can_refresh():
+        return False
+    try:
+        resp = requests.post(
+            f"{GHL_BASE_URL}/oauth/token",
+            data={
+                "client_id": config.GHL_CLIENT_ID,
+                "client_secret": config.GHL_CLIENT_SECRET,
+                "grant_type": "refresh_token",
+                "refresh_token": config.GHL_REFRESH_TOKEN,
+            },
+            timeout=15,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        new_token = data.get("access_token", "")
+        if new_token:
+            _access_token = new_token
+            # Store the new refresh token if one was returned
+            new_refresh = data.get("refresh_token", "")
+            if new_refresh:
+                config.GHL_REFRESH_TOKEN = new_refresh
+            logger.info("GHL access token refreshed successfully.")
+            return True
+        return False
+    except Exception as exc:
+        logger.error("GHL token refresh failed: %s", exc)
+        return False
+
+
+def _do_request(method: str, url: str, **kwargs) -> requests.Response:
+    """
+    Make a GHL API request, automatically retrying once on 401 after a token
+    refresh when OAuth2 refresh credentials are configured.
+
+    Parameters
+    ----------
+    method : str
+        HTTP method string to use (e.g. 'get', 'post').
+    url : str
+        Full request URL.
+    **kwargs :
+        Additional keyword arguments forwarded to ``requests.<method>()``.
+
+    Injects the standard GHL auth headers unless the caller supplies its own
+    ``headers`` kwarg (e.g. for multipart file uploads).
+
+    Raises ``requests.RequestException`` (including ``HTTPError``) on failure.
+    """
+    if "headers" not in kwargs:
+        kwargs["headers"] = _headers()
+    fn = getattr(requests, method)
+    resp = fn(url, **kwargs)
+    if resp.status_code == 401 and _can_refresh():
+        logger.info("GHL 401 – attempting token refresh and retry…")
+        if _refresh_access_token():
+            kwargs["headers"] = _headers()
+            resp = fn(url, **kwargs)
+    resp.raise_for_status()
+    return resp
+
 
 def _headers() -> dict[str, str]:
     """Build standard GHL request headers."""
     return {
-        "Authorization": f"Bearer {config.GHL_API_KEY}",
+        "Authorization": f"Bearer {_current_token()}",
         "Content-Type": "application/json",
         "Version": GHL_API_VERSION,
     }
@@ -54,15 +159,15 @@ def get_contact(contact_id: str) -> Optional[dict]:
         logger.warning("GHL credentials not configured – skipping get_contact.")
         return None
     try:
-        resp = requests.get(
+        resp = _do_request(
+            "get",
             f"{GHL_BASE_URL}/contacts/{contact_id}",
-            headers=_headers(),
             timeout=15,
         )
-        resp.raise_for_status()
         return resp.json().get("contact", resp.json())
     except requests.RequestException as exc:
-        logger.error("GHL get_contact(%s) failed: %s", contact_id, exc)
+        msg = _AUTH_HELP if _is_auth_error(exc) else str(exc)
+        logger.error("GHL get_contact(%s) failed: %s", contact_id, msg)
         return None
 
 
@@ -87,19 +192,19 @@ def get_or_create_contact(
     search_query = phone or email
     if search_query:
         try:
-            resp = requests.get(
+            resp = _do_request(
+                "get",
                 f"{GHL_BASE_URL}/contacts/",
-                headers=_headers(),
                 params={"locationId": config.GHL_LOCATION_ID, "query": search_query},
                 timeout=15,
             )
-            resp.raise_for_status()
             contacts = resp.json().get("contacts", [])
             if contacts:
                 logger.info("GHL found existing contact for %s", search_query)
                 return contacts[0]
         except requests.RequestException as exc:
-            logger.error("GHL contact search failed: %s", exc)
+            msg = _AUTH_HELP if _is_auth_error(exc) else str(exc)
+            logger.error("GHL contact search failed: %s", msg)
 
     # Create a new contact
     try:
@@ -116,18 +221,18 @@ def get_or_create_contact(
         if phone:
             payload["phone"] = phone
 
-        resp = requests.post(
+        resp = _do_request(
+            "post",
             f"{GHL_BASE_URL}/contacts/",
-            headers=_headers(),
             json=payload,
             timeout=15,
         )
-        resp.raise_for_status()
         contact = resp.json().get("contact", resp.json())
         logger.info("GHL created contact id=%s", contact.get("id"))
         return contact
     except requests.RequestException as exc:
-        logger.error("GHL create_contact failed: %s", exc)
+        msg = _AUTH_HELP if _is_auth_error(exc) else str(exc)
+        logger.error("GHL create_contact failed: %s", msg)
         return None
 
 
@@ -157,20 +262,20 @@ def send_dm(contact_id: str, message: str, message_type: str = "SMS") -> dict:
             "locationId": config.GHL_LOCATION_ID,
             "message": message,
         }
-        resp = requests.post(
+        resp = _do_request(
+            "post",
             f"{GHL_BASE_URL}/conversations/messages",
-            headers=_headers(),
             json=payload,
             timeout=15,
         )
-        resp.raise_for_status()
         data = resp.json()
         message_id = data.get("messageId") or data.get("id", "")
         logger.info("GHL DM sent to contact %s, messageId=%s", contact_id, message_id)
         return {"success": True, "messageId": message_id}
     except requests.RequestException as exc:
-        logger.error("GHL send_dm to %s failed: %s", contact_id, exc)
-        return {"success": False, "error": str(exc)}
+        msg = _AUTH_HELP if _is_auth_error(exc) else str(exc)
+        logger.error("GHL send_dm to %s failed: %s", contact_id, msg)
+        return {"success": False, "error": msg}
 
 
 def send_dm_to_conversation(conversation_id: str, message: str, message_type: str = "SMS") -> dict:
@@ -191,20 +296,20 @@ def send_dm_to_conversation(conversation_id: str, message: str, message_type: st
             "message": message,
             "conversationId": conversation_id,
         }
-        resp = requests.post(
+        resp = _do_request(
+            "post",
             f"{GHL_BASE_URL}/conversations/messages",
-            headers=_headers(),
             json=payload,
             timeout=15,
         )
-        resp.raise_for_status()
         data = resp.json()
         message_id = data.get("messageId") or data.get("id", "")
         logger.info("GHL DM into conv %s sent, messageId=%s", conversation_id, message_id)
         return {"success": True, "messageId": message_id}
     except requests.RequestException as exc:
-        logger.error("GHL send_dm_to_conversation(%s) failed: %s", conversation_id, exc)
-        return {"success": False, "error": str(exc)}
+        msg = _AUTH_HELP if _is_auth_error(exc) else str(exc)
+        logger.error("GHL send_dm_to_conversation(%s) failed: %s", conversation_id, msg)
+        return {"success": False, "error": msg}
 
 
 # ── Social Planner ────────────────────────────────────────────────────────────
@@ -220,7 +325,7 @@ def upload_media(file_path: str) -> Optional[str]:
         return None
     try:
         headers = {
-            "Authorization": f"Bearer {config.GHL_API_KEY}",
+            "Authorization": f"Bearer {_current_token()}",
             "Version": GHL_API_VERSION,
         }
         with open(file_path, "rb") as f:
@@ -235,8 +340,9 @@ def upload_media(file_path: str) -> Optional[str]:
         url = data.get("url") or data.get("fileUrl", "")
         logger.info("GHL media uploaded: %s", url)
         return url or None
-    except Exception as exc:
-        logger.error("GHL media upload failed: %s", exc)
+    except requests.RequestException as exc:
+        msg = _AUTH_HELP if _is_auth_error(exc) else str(exc)
+        logger.error("GHL media upload failed: %s", msg)
         return None
 
 
@@ -251,17 +357,17 @@ def get_social_accounts() -> list:
     if not is_configured():
         return []
     try:
-        resp = requests.get(
+        resp = _do_request(
+            "get",
             f"{GHL_BASE_URL}/social-media-posting/{config.GHL_LOCATION_ID}/accounts",
-            headers=_headers(),
             timeout=15,
         )
-        resp.raise_for_status()
         data = resp.json()
         accounts = data.get("accounts", data if isinstance(data, list) else [])
         return accounts
     except requests.RequestException as exc:
-        logger.error("GHL get_social_accounts failed: %s", exc)
+        msg = _AUTH_HELP if _is_auth_error(exc) else str(exc)
+        logger.error("GHL get_social_accounts failed: %s", msg)
         return []
 
 
@@ -326,17 +432,17 @@ def post_to_social_planner(
                     for a in accounts
                 ]
 
-        resp = requests.post(
+        resp = _do_request(
+            "post",
             f"{GHL_BASE_URL}/social-media-posting/{config.GHL_LOCATION_ID}/posts",
-            headers=_headers(),
             json=payload,
             timeout=30,
         )
-        resp.raise_for_status()
         data = resp.json()
         post_id = data.get("id") or data.get("postId", "")
         logger.info("GHL Social Planner post created: %s", post_id)
         return {"success": True, "post_id": post_id}
     except requests.RequestException as exc:
-        logger.error("GHL Social Planner post failed: %s", exc)
-        return {"success": False, "error": str(exc)}
+        msg = _AUTH_HELP if _is_auth_error(exc) else str(exc)
+        logger.error("GHL Social Planner post failed: %s", msg)
+        return {"success": False, "error": msg}

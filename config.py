@@ -88,3 +88,11 @@ GHL_AUTO_REPLY_MESSAGE: str = os.getenv(
 # Leave blank to auto-discover all connected accounts for the location.
 # Example: "abc123,def456"
 GHL_SOCIAL_ACCOUNT_IDS: str = os.getenv("GHL_SOCIAL_ACCOUNT_IDS", "")
+# OAuth2 credentials for automatic token refresh.
+# GHL Private Integration access tokens expire (typically after 24 hours).
+# Setting these three values enables the bot to refresh the token silently
+# instead of showing a 401 error.  Obtain them by completing the GHL OAuth2
+# flow for your Private Integration (GHL docs → OAuth 2.0 → Authorization Code).
+GHL_CLIENT_ID: str = os.getenv("GHL_CLIENT_ID", "")
+GHL_CLIENT_SECRET: str = os.getenv("GHL_CLIENT_SECRET", "")
+GHL_REFRESH_TOKEN: str = os.getenv("GHL_REFRESH_TOKEN", "")

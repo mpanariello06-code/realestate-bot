@@ -10,6 +10,7 @@ import json
 import sys
 import os
 import unittest
+import requests as _req
 from unittest.mock import MagicMock, patch
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
@@ -24,6 +25,14 @@ os.environ.setdefault("FLASK_SECRET_KEY", "test-secret")
 
 def _ghl_sig(payload: bytes, secret: str) -> str:
     return hmac.new(secret.encode(), payload, hashlib.sha256).hexdigest()
+
+
+def _make_http_error(status_code: int) -> _req.HTTPError:
+    """Build a requests.HTTPError whose .response.status_code == status_code."""
+    resp = MagicMock()
+    resp.status_code = status_code
+    exc = _req.HTTPError(response=resp)
+    return exc
 
 
 # ── services/ghl.py tests ─────────────────────────────────────────────────────
@@ -336,6 +345,185 @@ class TestCmdGhl(unittest.IsolatedAsyncioTestCase):
         # reply_text may or may not be called with rejection msg – just verify
         # the handler didn't crash
         self.assertIsNotNone(update)
+
+
+# ── 401 auth-error helpers ────────────────────────────────────────────────────
+
+class TestGhlAuthErrorHelpers(unittest.TestCase):
+
+    def setUp(self):
+        import config as cfg
+        cfg.GHL_API_KEY = "key"
+        cfg.GHL_LOCATION_ID = "loc"
+        cfg.GHL_CLIENT_ID = ""
+        cfg.GHL_CLIENT_SECRET = ""
+        cfg.GHL_REFRESH_TOKEN = ""
+        # Reset the module-level cached token
+        import services.ghl as ghl
+        ghl._access_token = ""
+
+    def test_is_auth_error_true_for_401(self):
+        from services.ghl import _is_auth_error
+        exc = _make_http_error(401)
+        self.assertTrue(_is_auth_error(exc))
+
+    def test_is_auth_error_false_for_404(self):
+        from services.ghl import _is_auth_error
+        exc = _make_http_error(404)
+        self.assertFalse(_is_auth_error(exc))
+
+    def test_is_auth_error_false_for_plain_exception(self):
+        from services.ghl import _is_auth_error
+        exc = _req.RequestException("timeout")
+        self.assertFalse(_is_auth_error(exc))
+
+    def test_can_refresh_false_when_no_credentials(self):
+        from services.ghl import _can_refresh
+        self.assertFalse(_can_refresh())
+
+    def test_can_refresh_true_when_all_credentials_set(self):
+        import config as cfg
+        cfg.GHL_CLIENT_ID = "cid"
+        cfg.GHL_CLIENT_SECRET = "csecret"
+        cfg.GHL_REFRESH_TOKEN = "rtoken"
+        from services.ghl import _can_refresh
+        self.assertTrue(_can_refresh())
+
+    def test_current_token_falls_back_to_config_key(self):
+        import services.ghl as ghl
+        ghl._access_token = ""
+        import config as cfg
+        cfg.GHL_API_KEY = "config_key"
+        self.assertEqual(ghl._current_token(), "config_key")
+
+    def test_current_token_prefers_refreshed_token(self):
+        import services.ghl as ghl
+        ghl._access_token = "refreshed_token"
+        import config as cfg
+        cfg.GHL_API_KEY = "config_key"
+        self.assertEqual(ghl._current_token(), "refreshed_token")
+        ghl._access_token = ""  # clean up
+
+    def test_send_dm_returns_auth_help_on_401(self):
+        import config as cfg
+        cfg.GHL_API_KEY = "expired_key"
+        cfg.GHL_LOCATION_ID = "loc"
+        from services import ghl
+        with patch("services.ghl._do_request", side_effect=_make_http_error(401)):
+            result = ghl.send_dm("contact1", "Hello")
+        self.assertFalse(result["success"])
+        self.assertIn("401", result["error"])
+        self.assertIn("GHL_API_KEY", result["error"])
+
+    def test_post_to_social_planner_returns_auth_help_on_401(self):
+        import config as cfg
+        cfg.GHL_API_KEY = "expired_key"
+        cfg.GHL_LOCATION_ID = "loc"
+        from services import ghl
+        with patch("services.ghl._do_request", side_effect=_make_http_error(401)), \
+             patch("services.ghl.get_social_accounts", return_value=[]):
+            result = ghl.post_to_social_planner("caption")
+        self.assertFalse(result["success"])
+        self.assertIn("401", result["error"])
+        self.assertIn("GHL_CLIENT_ID", result["error"])
+
+
+class TestGhlTokenRefresh(unittest.TestCase):
+
+    def setUp(self):
+        import config as cfg
+        cfg.GHL_API_KEY = "old_token"
+        cfg.GHL_LOCATION_ID = "loc"
+        cfg.GHL_CLIENT_ID = "cid"
+        cfg.GHL_CLIENT_SECRET = "csecret"
+        cfg.GHL_REFRESH_TOKEN = "rtoken"
+        import services.ghl as ghl
+        ghl._access_token = ""
+
+    def tearDown(self):
+        import config as cfg
+        cfg.GHL_CLIENT_ID = ""
+        cfg.GHL_CLIENT_SECRET = ""
+        cfg.GHL_REFRESH_TOKEN = ""
+        import services.ghl as ghl
+        ghl._access_token = ""
+
+    @patch("services.ghl.requests.post")
+    def test_refresh_access_token_updates_module_token(self, mock_post):
+        mock_resp = MagicMock()
+        mock_resp.json.return_value = {"access_token": "new_token_abc"}
+        mock_resp.raise_for_status = MagicMock()
+        mock_post.return_value = mock_resp
+
+        import services.ghl as ghl
+        result = ghl._refresh_access_token()
+        self.assertTrue(result)
+        self.assertEqual(ghl._access_token, "new_token_abc")
+
+    @patch("services.ghl.requests.post")
+    def test_refresh_access_token_also_updates_refresh_token(self, mock_post):
+        mock_resp = MagicMock()
+        mock_resp.json.return_value = {
+            "access_token": "new_access",
+            "refresh_token": "new_refresh",
+        }
+        mock_resp.raise_for_status = MagicMock()
+        mock_post.return_value = mock_resp
+
+        import services.ghl as ghl
+        import config as cfg
+        ghl._refresh_access_token()
+        self.assertEqual(cfg.GHL_REFRESH_TOKEN, "new_refresh")
+
+    @patch("services.ghl.requests.post")
+    def test_refresh_access_token_returns_false_on_error(self, mock_post):
+        mock_post.side_effect = _req.RequestException("network error")
+
+        import services.ghl as ghl
+        result = ghl._refresh_access_token()
+        self.assertFalse(result)
+
+    @patch("services.ghl.requests.post")
+    def test_do_request_retries_on_401_when_refresh_succeeds(self, mock_post):
+        """_do_request should retry after a successful token refresh."""
+        import requests as _req
+        import services.ghl as ghl
+
+        # First POST to the API returns 401; second succeeds
+        fail_resp = MagicMock()
+        fail_resp.status_code = 401
+
+        ok_resp = MagicMock()
+        ok_resp.status_code = 200
+        ok_resp.raise_for_status = MagicMock()
+        ok_resp.json.return_value = {"id": "post_1"}
+
+        # _refresh_access_token() itself calls requests.post → we need to
+        # mock the refresh call differently.  Use side_effect with a sequence:
+        refresh_resp = MagicMock()
+        refresh_resp.json.return_value = {"access_token": "new_tok"}
+        refresh_resp.raise_for_status = MagicMock()
+
+        call_count = {"num_calls": 0}
+
+        def _side_effect(url, **kwargs):
+            call_count["num_calls"] += 1
+            if "/oauth/token" in url:
+                return refresh_resp
+            if call_count["num_calls"] == 1:
+                return fail_resp
+            return ok_resp
+
+        mock_post.side_effect = _side_effect
+
+        result = ghl._do_request("post", f"{ghl.GHL_BASE_URL}/test", json={})
+        self.assertEqual(result, ok_resp)
+
+    def test_refresh_access_token_returns_false_when_no_credentials(self):
+        import config as cfg
+        cfg.GHL_CLIENT_ID = ""
+        import services.ghl as ghl
+        self.assertFalse(ghl._refresh_access_token())
 
 
 if __name__ == "__main__":
