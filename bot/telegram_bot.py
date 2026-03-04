@@ -104,11 +104,12 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.effective_message.reply_text(
         "👋 *Welcome to the Real Estate Agent Bot!*\n\n"
         "I help you:\n"
-        "• 📸 Post listings to Facebook & Instagram\n"
-        "• 🎯 Qualify and track leads\n"
+        "• 📸 Post listings to Facebook & Instagram via GHL\n"
+        "• 🔍 Qualify and track leads with AI\n"
         "• 📊 Monitor your performance\n"
-        "• 📈 Get weekly reports\n\n"
-        "Choose an option below or type /help for a command list.",
+        "• 📈 Get weekly reports\n"
+        "• 🔗 Manage Go High Level auto-DM replies\n\n"
+        "Tap a button below or type /help for a full command list.",
         parse_mode=ParseMode.MARKDOWN,
         reply_markup=main_menu_keyboard(),
     )
@@ -228,14 +229,15 @@ async def handle_qualify_save_callback(
 ) -> int:
     """Handle the Save / Discard button after qualification."""
     query = update.callback_query
-    await query.answer()
 
     if query.data == "qualify_discard":
+        await query.answer("🗑 Discarded")
         context.user_data.pop(CTX_QUALIFY_RESULT, None)
         await query.edit_message_text("🗑 Lead discarded.")
         return ConversationHandler.END
 
     if query.data == "qualify_save":
+        await query.answer("💾 Saving…")
         result = context.user_data.pop(CTX_QUALIFY_RESULT, {})
         result.setdefault("platform", "telegram")
         saved = sheets.save_lead(result)
@@ -247,6 +249,7 @@ async def handle_qualify_save_callback(
             )
         return ConversationHandler.END
 
+    await query.answer()
     return AWAITING_QUALIFY_SAVE
 
 
@@ -481,37 +484,41 @@ async def handle_caption_edit(update: Update, context: ContextTypes.DEFAULT_TYPE
 
 async def handle_confirm_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     query = update.callback_query
-    await query.answer()
 
     if query.data == "cancel":
+        await query.answer("❌ Cancelled")
         _cleanup_media(context)
         await query.edit_message_text("❌ Post cancelled.")
         return ConversationHandler.END
 
     if query.data == "edit_caption":
+        await query.answer("✏️ Edit mode")
         await query.edit_message_text("✏️ Please type your new caption:")
         return AWAITING_CAPTION_EDIT
 
     if query.data == "confirm_post":
+        await query.answer("📱 Choosing platform…")
         await query.edit_message_text(
             "📱 Select which platform(s) to post to:",
             reply_markup=posting_platform_keyboard(),
         )
         return AWAITING_PLATFORM
 
+    await query.answer()
     return AWAITING_CONFIRM
 
 
 async def handle_platform_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     query = update.callback_query
-    await query.answer()
 
     if query.data == "cancel":
+        await query.answer("❌ Cancelled")
         _cleanup_media(context)
         await query.edit_message_text("❌ Post cancelled.")
         return ConversationHandler.END
 
     platform = query.data.replace("platform_", "")
+    await query.answer(f"🚀 Posting to {platform.title()}…")
     context.user_data[CTX_PLATFORM] = platform
 
     caption = context.user_data.get(CTX_CAPTION, "")
@@ -574,14 +581,15 @@ def _cleanup_media(context: ContextTypes.DEFAULT_TYPE) -> None:
 
 async def handle_lead_action(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     query = update.callback_query
-    await query.answer()
     parts = query.data.split("_")
     if len(parts) < 3:
+        await query.answer()
         return
     action = parts[1]            # contacted | closed | lost
     index = int(parts[2])        # 0-based display index
     status_map = {"contacted": "contacted", "closed": "closed", "lost": "lost"}
     status = status_map.get(action, "new")
+    await query.answer(f"✅ Marked as {status.title()}")
     sheets.update_lead_status(index + 1, status)
     await query.edit_message_reply_markup(reply_markup=None)
     await context.bot.send_message(
@@ -593,18 +601,56 @@ async def handle_lead_action(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
 # ── Main menu callback ────────────────────────────────────────────────────────
 
+# Toast messages shown instantly when a menu button is tapped
+_MENU_TOASTS: dict[str, str] = {
+    "post_listing":    "📸 Starting post flow…",
+    "qualify_lead":    "🔍 Opening qualify flow…",
+    "qualified_leads": "🎯 Loading qualified leads…",
+    "all_leads":       "📋 Loading all leads…",
+    "performance":     "📊 Loading performance…",
+    "weekly_report":   "📈 Generating report…",
+    "ghl_status":      "🔗 Loading GHL status…",
+    "notes_info":      "📝 Opening notes guide…",
+    "help":            "❓ Loading help…",
+}
+
+
 async def handle_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     query = update.callback_query
-    await query.answer()
+    toast = _MENU_TOASTS.get(query.data, "Loading…")
+    await query.answer(toast)
+
     cmd_map = {
-        "performance": cmd_performance,
+        "qualify_lead":    cmd_qualify,
         "qualified_leads": cmd_leads,
-        "all_leads": cmd_leads,
-        "weekly_report": cmd_report,
+        "all_leads":       cmd_leads,
+        "performance":     cmd_performance,
+        "weekly_report":   cmd_report,
+        "ghl_status":      cmd_ghl,
+        "help":            cmd_help,
+        "notes_info":      _cmd_notes_info,
     }
     handler = cmd_map.get(query.data)
     if handler:
         await handler(update, context)
+
+
+async def _cmd_notes_info(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """
+    Invoked via the 'notes_info' menu button callback.
+    Explains how to use the /notes command with examples, then re-shows the main menu.
+    """
+    await update.effective_message.reply_text(
+        "*📝 Adding Notes to a Lead*\n\n"
+        "Use the `/notes` command from the chat:\n\n"
+        "`/notes <lead_number> <your note>`\n\n"
+        "*Examples:*\n"
+        "• `/notes 3 Called back – viewing Saturday 2pm`\n"
+        "• `/notes 1 Pre-approved for $550k, very motivated`\n\n"
+        "The lead number matches the number shown next to the lead in `/leads`.",
+        parse_mode=ParseMode.MARKDOWN,
+        reply_markup=main_menu_keyboard(),
+    )
 
 
 # ── Build Application ─────────────────────────────────────────────────────────
@@ -687,7 +733,7 @@ def build_application() -> Application:
     app.add_handler(
         CallbackQueryHandler(
             handle_menu_callback,
-            pattern="^(performance|qualified_leads|all_leads|weekly_report)$",
+            pattern="^(qualify_lead|performance|qualified_leads|all_leads|weekly_report|ghl_status|notes_info|help)$",
         )
     )
 
