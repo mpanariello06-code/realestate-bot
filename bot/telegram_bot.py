@@ -48,6 +48,7 @@ from bot.keyboards import (
 )
 from services import lead_qualifier, sheets, social_poster
 from services.weekly_report import send_weekly_report
+from services import ghl as ghl_service
 
 logger = logging.getLogger(__name__)
 
@@ -127,6 +128,7 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         "/notes – Add a note to a lead (e.g. `/notes 3 Viewing Saturday 2pm`)\n"
         "/performance – View performance stats\n"
         "/report – Send the weekly report now\n"
+        "/ghl – Go High Level integration status & setup guide\n"
         "/myid – Show your Telegram chat ID (useful for setup)\n"
         "/help – This help message",
         parse_mode=ParseMode.MARKDOWN,
@@ -354,6 +356,56 @@ async def cmd_report(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         return
     await update.effective_message.reply_text("📈 Generating your weekly report…")
     await send_weekly_report(context.bot)
+
+
+# ── /ghl ──────────────────────────────────────────────────────────────────────
+
+async def cmd_ghl(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """
+    Show the current Go High Level integration status and quick-start guide.
+    """
+    if not await _agent_only(update, context):
+        return
+
+    configured = ghl_service.is_configured()
+    auto_reply_status = "✅ Enabled" if config.GHL_AUTO_REPLY_ENABLED else "❌ Disabled"
+    api_status = "✅ Credentials set" if configured else "❌ Not configured"
+
+    lines = [
+        "*🔗 Go High Level Integration*\n",
+        f"API Status: {api_status}",
+        f"Auto-DM Reply: {auto_reply_status}",
+    ]
+
+    if configured:
+        lines.append(f"Location ID: `{config.GHL_LOCATION_ID}`")
+        lines.append(
+            "\n*Auto-reply message:*\n"
+            f"_{config.GHL_AUTO_REPLY_MESSAGE.format(first_name='[Name]', last_name='', full_name='[Name]')}_"
+        )
+        lines.append(
+            "\n*Webhook URL* (register this in GHL → Settings → Webhooks):\n"
+            "`<your-server>/webhook/ghl`\n"
+            "Subscribe to: `InboundMessage`"
+        )
+    else:
+        lines.append(
+            "\n*Setup Steps:*\n"
+            "1️⃣ Add these to your `.env` file:\n"
+            "   `GHL_API_KEY=<your private integration key>`\n"
+            "   `GHL_LOCATION_ID=<your sub-account location ID>`\n\n"
+            "2️⃣ In GHL → Settings → Webhooks, add:\n"
+            "   URL: `<your-server>/webhook/ghl`\n"
+            "   Event: `InboundMessage`\n\n"
+            "3️⃣ Restart the bot and run `/ghl` again to confirm.\n\n"
+            "4️⃣ Optional: customise the auto-reply with:\n"
+            "   `GHL_AUTO_REPLY_MESSAGE=Hi {first_name}! ...`"
+        )
+
+    await update.effective_message.reply_text(
+        "\n".join(lines),
+        parse_mode=ParseMode.MARKDOWN,
+    )
 
 
 # ── Post listing flow ─────────────────────────────────────────────────────────
@@ -626,6 +678,7 @@ def build_application() -> Application:
     app.add_handler(CommandHandler("performance", cmd_performance))
     app.add_handler(CommandHandler("report", cmd_report))
     app.add_handler(CommandHandler("notes", cmd_notes))
+    app.add_handler(CommandHandler("ghl", cmd_ghl))
 
     # Callback query handlers
     app.add_handler(

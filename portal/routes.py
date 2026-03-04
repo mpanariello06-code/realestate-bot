@@ -12,7 +12,7 @@ import requests as http_requests
 from flask import Blueprint, jsonify, render_template, request
 
 import config
-from services import sheets
+from services import sheets, ghl as ghl_service
 
 logger = logging.getLogger(__name__)
 
@@ -216,5 +216,120 @@ def fb_webhook_event():
                         )
                         _notify_agents(notification)
                         logger.info("Facebook comment from %s forwarded to agents.", commenter)
+
+    return jsonify({"status": "ok"}), 200
+
+
+# ── Go High Level Webhook ─────────────────────────────────────────────────────
+
+def _verify_ghl_signature(payload: bytes, signature_header: str) -> bool:
+    """
+    Validate the x-ghl-signature header sent by GHL.
+    Returns True if the signature matches (or if no secret is configured).
+    """
+    if not config.GHL_WEBHOOK_SECRET:
+        return True
+    if not signature_header:
+        return False
+    import hashlib
+    import hmac as _hmac
+    expected = _hmac.new(
+        config.GHL_WEBHOOK_SECRET.encode(),
+        payload,
+        hashlib.sha256,
+    ).hexdigest()
+    return _hmac.compare_digest(expected, signature_header)
+
+
+@bp.route("/webhook/ghl", methods=["POST"])
+def ghl_webhook_event():
+    """
+    Receive Go High Level webhook events.
+
+    GHL sends an InboundMessage event whenever a contact replies to a post
+    or sends a new message via any connected social channel (Facebook, Instagram,
+    SMS, WhatsApp, Live Chat, etc.).
+
+    On each InboundMessage the bot will:
+      1. Validate the optional HMAC-SHA256 signature.
+      2. Send an auto-DM reply into the same GHL conversation thread (if
+         GHL_AUTO_REPLY_ENABLED=true).
+      3. Forward a notification to every agent on Telegram.
+
+    GHL setup checklist
+    ───────────────────
+    1. In GHL → Settings → Integrations → Webhooks, add a new webhook
+       pointing to  <your-server>/webhook/ghl
+    2. Subscribe to the  InboundMessage  event type.
+    3. Optionally set a signing secret and add it as GHL_WEBHOOK_SECRET in .env.
+    4. Set GHL_API_KEY and GHL_LOCATION_ID in .env (needed for auto-DM).
+    5. Customise GHL_AUTO_REPLY_MESSAGE in .env (use {first_name} as a placeholder).
+
+    Social Planner / post-reply flow
+    ─────────────────────────────────
+    When a follower comments on or DMs a post that was published through
+    GHL's Social Planner, GHL creates an inbound conversation and fires this
+    webhook.  The bot then auto-replies and pings the agent – no manual
+    Facebook/Instagram monitoring needed.
+    """
+    # Signature validation
+    sig = request.headers.get("X-GHL-Signature", "")
+    if not _verify_ghl_signature(request.get_data(), sig):
+        logger.warning("GHL webhook: invalid signature, rejecting.")
+        return jsonify({"error": "Invalid signature"}), 403
+
+    data = request.get_json(force=True, silent=True) or {}
+    event_type = data.get("type", "")
+
+    if event_type == "InboundMessage":
+        contact_id      = data.get("contactId", "")
+        conversation_id = data.get("conversationId", "")
+        first_name      = data.get("firstName") or data.get("contactName", "").split()[0] or "there"
+        last_name       = data.get("lastName", "")
+        full_name       = f"{first_name} {last_name}".strip() or "Unknown"
+        body            = data.get("body") or data.get("message", "")
+        channel         = data.get("channel") or data.get("messageType", "unknown")
+        source_url      = data.get("sourceUrl", "")  # URL of the post they replied to
+
+        logger.info(
+            "GHL InboundMessage from contact=%s conv=%s channel=%s",
+            contact_id, conversation_id, channel,
+        )
+
+        # ── Auto-DM reply ──────────────────────────────────────────────────────
+        if config.GHL_AUTO_REPLY_ENABLED and body and contact_id:
+            reply_text = config.GHL_AUTO_REPLY_MESSAGE.format(
+                first_name=first_name,
+                last_name=last_name,
+                full_name=full_name,
+            )
+            # Prefer replying into the same conversation so the reply stays
+            # on the correct channel (Facebook/Instagram/SMS/etc.)
+            if conversation_id:
+                result = ghl_service.send_dm_to_conversation(
+                    conversation_id, reply_text
+                )
+            else:
+                result = ghl_service.send_dm(contact_id, reply_text)
+
+            if result.get("success"):
+                logger.info("GHL auto-DM sent to contact %s.", contact_id)
+            else:
+                logger.error("GHL auto-DM failed: %s", result.get("error"))
+
+        # ── Telegram notification ──────────────────────────────────────────────
+        channel_label = channel.replace("_", " ").title() if channel else "Social"
+        post_line = f"\n🔗 Post: {source_url}" if source_url else ""
+        notification = (
+            f"📩 *New {channel_label} reply via GHL!*\n\n"
+            f"👤 {full_name}\n"
+            f"✉️ {body}{post_line}\n\n"
+            + (
+                "✅ _Auto-DM reply sent._"
+                if config.GHL_AUTO_REPLY_ENABLED and body
+                else "_Auto-reply is disabled._"
+            )
+        )
+        _notify_agents(notification)
 
     return jsonify({"status": "ok"}), 200

@@ -67,3 +67,20 @@ FACEBOOK_WEBHOOK_VERIFY_TOKEN: str = os.getenv("FACEBOOK_WEBHOOK_VERIFY_TOKEN", 
 # Used to validate the X-Hub-Signature-256 header on incoming webhook payloads.
 # Set to your Facebook App Secret (found in App → Settings → Basic).
 FACEBOOK_APP_SECRET: str = os.getenv("FACEBOOK_APP_SECRET", "")
+
+# ── Go High Level (GHL) ───────────────────────────────────────────────────────
+# Private Integration Key (or Agency API key) from GHL Settings → Integrations.
+GHL_API_KEY: str = os.getenv("GHL_API_KEY", "")
+# The sub-account / Location ID the bot operates under.
+GHL_LOCATION_ID: str = os.getenv("GHL_LOCATION_ID", "")
+# Optional HMAC-SHA256 secret for validating inbound GHL webhook payloads.
+GHL_WEBHOOK_SECRET: str = os.getenv("GHL_WEBHOOK_SECRET", "")
+# When True, the bot will automatically DM anyone who replies to a post.
+GHL_AUTO_REPLY_ENABLED: bool = os.getenv("GHL_AUTO_REPLY_ENABLED", "true").lower() == "true"
+# Message sent in the auto-DM.  Use {first_name} as a placeholder.
+GHL_AUTO_REPLY_MESSAGE: str = os.getenv(
+    "GHL_AUTO_REPLY_MESSAGE",
+    "Hi {first_name}! 👋 Thanks for your interest. "
+    "One of our agents will be in touch with you shortly. "
+    "In the meantime, feel free to ask any questions!",
+)
