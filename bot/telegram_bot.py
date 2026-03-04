@@ -687,6 +687,15 @@ async def handle_confirm_callback(update: Update, context: ContextTypes.DEFAULT_
                 uploaded_url = cloudinary_upload.upload_image(image_path)
                 if uploaded_url:
                     image_url = uploaded_url
+                    # Echo the public URL back to the agent so they can see it
+                    await context.bot.send_message(
+                        chat_id=update.effective_chat.id,
+                        text=(
+                            f"🖼 *Photo uploaded to Cloudinary!*\n\n"
+                            f"Public URL:\n`{image_url}`"
+                        ),
+                        parse_mode=ParseMode.MARKDOWN,
+                    )
                 elif not cloudinary_upload.is_configured():
                     image_url = ""  # Cloudinary not set up – omit the field
                 else:

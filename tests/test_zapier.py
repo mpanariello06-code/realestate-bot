@@ -445,6 +445,14 @@ class TestConfirmCallbackZapierPath(unittest.IsolatedAsyncioTestCase):
         listing = mock_post.call_args[0][0]
         self.assertEqual(listing.get("image_url"), public_url)
 
+        # The bot must also send the public URL back to the agent in Telegram
+        send_calls = [
+            call[1].get("text", "") or (call[0][0] if call[0] else "")
+            for call in context.bot.send_message.call_args_list
+        ]
+        url_echoed = any(public_url in t for t in send_calls)
+        self.assertTrue(url_echoed, "Expected Cloudinary URL to be echoed back to the agent")
+
     async def test_confirm_without_zapier_falls_through_to_ghl(self):
         import bot.telegram_bot as tb
         update = MagicMock()
