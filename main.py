@@ -8,6 +8,42 @@ Starts three concurrent processes:
 """
 from __future__ import annotations
 
+import sys
+
+# ── Dependency check ──────────────────────────────────────────────────────────
+# Run this before any project imports so users get a clear message instead of
+# a raw ModuleNotFoundError traceback when dependencies are not installed.
+_REQUIRED = {
+    "apscheduler": "APScheduler",
+    "telegram": "python-telegram-bot",
+    "openai": "openai",
+    "gspread": "gspread",
+    "flask": "flask",
+    "dotenv": "python-dotenv",
+    "requests": "requests",
+}
+
+def _check_dependencies() -> None:
+    import importlib
+    missing = []
+    for module, package in _REQUIRED.items():
+        try:
+            importlib.import_module(module)
+        except ImportError:
+            missing.append(package)
+    if missing:
+        print(
+            "\n❌  Missing required packages.  Please run:\n\n"
+            "       pip install -r requirements.txt\n\n"
+            "Then try again.\n\n"
+            f"Missing: {', '.join(missing)}",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+_check_dependencies()
+# ─────────────────────────────────────────────────────────────────────────────
+
 import asyncio
 import logging
 import threading
