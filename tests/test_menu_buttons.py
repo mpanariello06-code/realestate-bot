@@ -30,8 +30,8 @@ class TestMainMenuKeyboard(unittest.TestCase):
     def test_qualify_lead_button_present(self):
         self.assertIn("qualify_lead", self._all_callback_data())
 
-    def test_ghl_status_button_present(self):
-        self.assertIn("ghl_status", self._all_callback_data())
+    def test_zapier_status_button_present(self):
+        self.assertIn("zapier_status", self._all_callback_data())
 
     def test_weekly_report_button_present(self):
         self.assertIn("weekly_report", self._all_callback_data())

@@ -50,6 +50,7 @@ from bot.keyboards import (
 from services import lead_qualifier, sheets, social_poster
 from services.weekly_report import send_weekly_report
 from services import ghl as ghl_service
+from services import zapier as zapier_service
 
 logger = logging.getLogger(__name__)
 
@@ -428,18 +429,63 @@ async def cmd_ghl(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     )
 
 
+# ── /zapier ───────────────────────────────────────────────────────────────────
+
+async def cmd_zapier(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """
+    Show the current Zapier integration status and quick-start guide.
+    """
+    if not await _agent_only(update, context):
+        return
+
+    configured = zapier_service.is_configured()
+    status = "✅ Webhook URL configured" if configured else "❌ Not configured"
+
+    lines = [
+        "*📡 Zapier Integration*\n",
+        f"Status: {status}",
+    ]
+
+    if configured:
+        lines.append(
+            "\n*How it works:*\n"
+            "When you tap *Post Listing*, the bot sends the caption and "
+            "photo to your Zapier webhook.  Zapier then publishes the post "
+            "to Facebook and/or Instagram automatically."
+        )
+    else:
+        lines.append(
+            "\n*Setup Steps:*\n"
+            "1️⃣ In Zapier, create a new Zap:\n"
+            "   Trigger: *Webhooks by Zapier → Catch Hook*\n"
+            "   Copy the generated webhook URL.\n\n"
+            "2️⃣ Add your posting actions, e.g.:\n"
+            "   Action 1: *Facebook Pages → Create Page Post*\n"
+            "   Map `caption` to the post body.\n"
+            "   Action 2: *Instagram for Business → Create Photo Post*\n"
+            "   Map `caption` to the caption, `image` to the photo.\n\n"
+            "3️⃣ Add to your `.env` file:\n"
+            "   `ZAPIER_WEBHOOK_URL=https://hooks.zapier.com/hooks/catch/...`\n\n"
+            "4️⃣ Restart the bot and run `/zapier` again to confirm."
+        )
+
+    await update.effective_message.reply_text(
+        "\n".join(lines),
+        parse_mode=ParseMode.MARKDOWN,
+    )
+
+
 # ── Post listing flow ─────────────────────────────────────────────────────────
 
 async def cmd_post(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     if not await _agent_only(update, context):
         return ConversationHandler.END
-    via_ghl = ghl_service.is_configured()
-    channel_note = (
-        "Your post will be published via *GHL Social Planner* "
-        "(Facebook & Instagram)."
-        if via_ghl
-        else "You will choose the target platform after confirming the caption."
-    )
+    if zapier_service.is_configured():
+        channel_note = "Your post will be published via *Zapier* (Facebook & Instagram)."
+    elif ghl_service.is_configured():
+        channel_note = "Your post will be published via *GHL Social Planner* (Facebook & Instagram)."
+    else:
+        channel_note = "You will choose the target platform after confirming the caption."
     await update.effective_message.reply_text(
         "📸 *New Listing Post*\n\n"
         "Please send me a *photo or video* of the property, "
@@ -522,7 +568,32 @@ async def handle_confirm_callback(update: Update, context: ContextTypes.DEFAULT_
         return AWAITING_CAPTION_EDIT
 
     if query.data == "confirm_post":
-        # ── GHL path: post directly, no platform selection needed ─────────
+        # ── Zapier path (preferred) ───────────────────────────────────────────
+        if zapier_service.is_configured():
+            await query.answer("🚀 Sending to Zapier…")
+            caption = context.user_data.get(CTX_CAPTION, "")
+            image_path = context.user_data.get(CTX_MEDIA_PATH)
+            media_type = context.user_data.get(CTX_MEDIA_TYPE, "photo")
+            await query.edit_message_text("🚀 Sending to Zapier…")
+            res = zapier_service.post_to_social(
+                caption,
+                image_path if media_type == "photo" else None,
+            )
+            result_text = (
+                "✅ Zapier: Post sent! Zapier will publish it to Facebook & Instagram."
+                if res.get("success")
+                else f"❌ Zapier: {res.get('error', 'Unknown error')}"
+            )
+            _cleanup_media(context)
+            await context.bot.send_message(
+                chat_id=update.effective_chat.id,
+                text=f"*Post Results:*\n{result_text}",
+                parse_mode=ParseMode.MARKDOWN,
+                reply_markup=main_menu_keyboard(),
+            )
+            return ConversationHandler.END
+
+        # ── GHL path ─────────────────────────────────────────────────────────
         if ghl_service.is_configured():
             await query.answer("🚀 Posting via GHL Social Planner…")
             caption = context.user_data.get(CTX_CAPTION, "")
@@ -547,7 +618,7 @@ async def handle_confirm_callback(update: Update, context: ContextTypes.DEFAULT_
             )
             return ConversationHandler.END
 
-        # ── Fallback: let agent choose platform (direct API) ───────────────
+        # ── Fallback: let agent choose platform (direct API) ──────────────────
         await query.answer("📱 Choosing platform…")
         await query.edit_message_text(
             "📱 Select which platform(s) to post to:",
@@ -691,6 +762,7 @@ _MENU_TOASTS: dict[str, str] = {
     "all_leads":       "📋 Loading all leads…",
     "performance":     "📊 Loading performance…",
     "weekly_report":   "📈 Generating report…",
+    "zapier_status":   "📡 Loading Zapier status…",
     "ghl_status":      "🔗 Loading GHL status…",
     "notes_info":      "📝 Opening notes guide…",
     "help":            "❓ Loading help…",
@@ -750,6 +822,7 @@ async def handle_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYP
         "all_leads":       cmd_leads,
         "performance":     cmd_performance,
         "weekly_report":   cmd_report,
+        "zapier_status":   cmd_zapier,
         "ghl_status":      cmd_ghl,
         "help":            cmd_help,
         "notes_info":      _cmd_notes_info,
@@ -849,6 +922,7 @@ def build_application() -> Application:
     app.add_handler(CommandHandler("report", cmd_report))
     app.add_handler(CommandHandler("notes", cmd_notes))
     app.add_handler(CommandHandler("ghl", cmd_ghl))
+    app.add_handler(CommandHandler("zapier", cmd_zapier))
     app.add_handler(CommandHandler("stopbot", cmd_stop_bot))
     app.add_handler(CommandHandler("startbot", cmd_start_bot))
 
@@ -859,7 +933,7 @@ def build_application() -> Application:
     app.add_handler(
         CallbackQueryHandler(
             handle_menu_callback,
-            pattern="^(qualify_lead|performance|qualified_leads|all_leads|weekly_report|ghl_status|notes_info|help|stop_bot|start_bot)$",
+            pattern="^(qualify_lead|performance|qualified_leads|all_leads|weekly_report|zapier_status|ghl_status|notes_info|help|stop_bot|start_bot)$",
         )
     )
 

@@ -68,6 +68,13 @@ FACEBOOK_WEBHOOK_VERIFY_TOKEN: str = os.getenv("FACEBOOK_WEBHOOK_VERIFY_TOKEN", 
 # Set to your Facebook App Secret (found in App → Settings → Basic).
 FACEBOOK_APP_SECRET: str = os.getenv("FACEBOOK_APP_SECRET", "")
 
+# ── Zapier ───────────────────────────────────────────────────────────────────
+# Webhook URL from a Zapier "Catch Hook" trigger.  When set, the bot sends
+# every "Post Listing" payload here so Zapier can publish it to Facebook
+# and/or Instagram.  Leave blank to fall back to GHL Social Planner or the
+# direct Facebook/Instagram API.
+ZAPIER_WEBHOOK_URL: str = os.getenv("ZAPIER_WEBHOOK_URL", "")
+
 # ── Go High Level (GHL) ───────────────────────────────────────────────────────
 # Private Integration Key (or Agency API key) from GHL Settings → Integrations.
 GHL_API_KEY: str = os.getenv("GHL_API_KEY", "")

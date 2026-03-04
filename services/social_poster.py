@@ -1,8 +1,8 @@
 """
 Social Media Poster
-Posts property listings (photos/videos + caption) via Go High Level's
-Social Planner API.  Direct Facebook/Instagram Graph API calls are kept
-as a fallback for environments where GHL is not configured.
+Posts property listings (photos/videos + caption) via Zapier, Go High Level's
+Social Planner API, or the direct Facebook/Instagram Graph API (in that order
+of preference).
 """
 from __future__ import annotations
 
@@ -13,6 +13,7 @@ import requests
 
 import config
 from services import ghl as ghl_service
+from services import zapier as zapier_service
 
 logger = logging.getLogger(__name__)
 
@@ -176,13 +177,22 @@ def post_listing(
     """
     Post a property listing to all configured social platforms.
 
-    When GHL is configured the listing is published via GHL's Social Planner
-    (which handles Facebook and Instagram automatically).  If GHL is not
-    configured the function falls back to direct Facebook/Instagram API calls.
+    Priority order:
+      1. Zapier webhook (when ZAPIER_WEBHOOK_URL is set) – sends to Facebook
+         and Instagram via your Zapier Zap.
+      2. GHL Social Planner (when GHL_API_KEY + GHL_LOCATION_ID are set) –
+         publishes via Go High Level.
+      3. Direct Facebook/Instagram Graph API (always-available fallback).
 
     Returns a dict mapping platform name → result dict.
     """
-    # ── GHL Social Planner path (recommended) ─────────────────────────────────
+    # ── Zapier path (preferred) ───────────────────────────────────────────────
+    if zapier_service.is_configured():
+        media = image_path or video_path
+        result = zapier_service.post_to_social(caption, media)
+        return {"zapier": result}
+
+    # ── GHL Social Planner path ───────────────────────────────────────────────
     if ghl_service.is_configured():
         media = image_path or video_path
         result = ghl_service.post_to_social_planner(caption, media)
