@@ -1,12 +1,12 @@
 """
-Tests for the Zapier webhook integration (services/zapier.py) and the
-Telegram bot's Zapier posting path.
+Tests for the Zapier webhook integration (services/zapier.py),
+Cloudinary upload service (services/cloudinary_upload.py),
+and the Telegram bot's structured listing posting flow.
 """
 from __future__ import annotations
 
 import sys
 import os
-import tempfile
 import unittest
 import requests as _req
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -43,7 +43,7 @@ class TestZapierIsConfigured(unittest.TestCase):
         self.assertTrue(zapier.is_configured())
 
 
-class TestZapierPostToSocial(unittest.TestCase):
+class TestZapierPostListing(unittest.TestCase):
 
     def setUp(self):
         import config as cfg
@@ -57,67 +57,60 @@ class TestZapierPostToSocial(unittest.TestCase):
         import config as cfg
         cfg.ZAPIER_WEBHOOK_URL = ""
         from services import zapier
-        result = zapier.post_to_social("Hello")
+        result = zapier.post_listing({"description": "Hello"})
         self.assertFalse(result["success"])
         self.assertIn("not configured", result["error"])
 
     @patch("services.zapier.requests.post")
-    def test_caption_only_sends_json(self, mock_post):
+    def test_sends_full_structured_json(self, mock_post):
         mock_resp = MagicMock()
         mock_resp.status_code = 200
         mock_resp.raise_for_status = MagicMock()
         mock_post.return_value = mock_resp
 
         from services import zapier
-        result = zapier.post_to_social("Amazing 3-bed house!")
+        listing = {
+            "description": "Beautiful 3-bedroom home",
+            "price": "$650,000",
+            "location": "Ottawa, ON",
+            "bedrooms": "3",
+            "bathrooms": "2",
+            "contact_phone": "613-555-1234",
+            "image_url": "https://res.cloudinary.com/demo/photo.jpg",
+        }
+        result = zapier.post_listing(listing)
         self.assertTrue(result["success"])
         self.assertEqual(result["status_code"], 200)
-        # Should send JSON, not multipart
         call_kwargs = mock_post.call_args[1]
         self.assertIn("json", call_kwargs)
-        self.assertEqual(call_kwargs["json"]["caption"], "Amazing 3-bed house!")
+        sent = call_kwargs["json"]
+        self.assertEqual(sent["description"], "Beautiful 3-bedroom home")
+        self.assertEqual(sent["price"], "$650,000")
+        self.assertEqual(sent["location"], "Ottawa, ON")
+        self.assertEqual(sent["bedrooms"], "3")
+        self.assertEqual(sent["bathrooms"], "2")
+        self.assertEqual(sent["contact_phone"], "613-555-1234")
+        self.assertEqual(sent["image_url"], "https://res.cloudinary.com/demo/photo.jpg")
 
     @patch("services.zapier.requests.post")
-    def test_with_image_sends_multipart(self, mock_post):
-        mock_resp = MagicMock()
-        mock_resp.status_code = 200
-        mock_resp.raise_for_status = MagicMock()
-        mock_post.return_value = mock_resp
-
-        tmp = tempfile.NamedTemporaryFile(suffix=".jpg", delete=False)
-        tmp.write(b"\xff\xd8\xff")
-        tmp.close()
-        try:
-            from services import zapier
-            result = zapier.post_to_social("House with pool", tmp.name)
-            self.assertTrue(result["success"])
-            call_kwargs = mock_post.call_args[1]
-            # multipart: data + files, not json
-            self.assertIn("files", call_kwargs)
-            self.assertIn("data", call_kwargs)
-            self.assertEqual(call_kwargs["data"]["caption"], "House with pool")
-        finally:
-            os.unlink(tmp.name)
-
-    @patch("services.zapier.requests.post")
-    def test_missing_image_path_falls_back_to_json(self, mock_post):
+    def test_sends_json_without_image_url(self, mock_post):
         mock_resp = MagicMock()
         mock_resp.status_code = 200
         mock_resp.raise_for_status = MagicMock()
         mock_post.return_value = mock_resp
 
         from services import zapier
-        result = zapier.post_to_social("Caption", image_path="/tmp/nonexistent.jpg")
+        result = zapier.post_listing({"description": "No photo listing"})
         self.assertTrue(result["success"])
         call_kwargs = mock_post.call_args[1]
         self.assertIn("json", call_kwargs)
+        self.assertNotIn("image_url", call_kwargs["json"])
 
     @patch("services.zapier.requests.post")
     def test_returns_error_on_request_failure(self, mock_post):
         mock_post.side_effect = _req.RequestException("timeout")
-
         from services import zapier
-        result = zapier.post_to_social("Caption")
+        result = zapier.post_listing({"description": "Test"})
         self.assertFalse(result["success"])
         self.assertIn("timeout", result["error"])
 
@@ -126,10 +119,100 @@ class TestZapierPostToSocial(unittest.TestCase):
         mock_resp = MagicMock()
         mock_resp.status_code = 400
         mock_post.side_effect = _req.HTTPError(response=mock_resp)
-
         from services import zapier
-        result = zapier.post_to_social("Caption")
+        result = zapier.post_listing({"description": "Test"})
         self.assertFalse(result["success"])
+
+
+# ── services/cloudinary_upload.py ─────────────────────────────────────────────
+
+class TestCloudinaryIsConfigured(unittest.TestCase):
+
+    def setUp(self):
+        import config as cfg
+        self._orig_name = cfg.CLOUDINARY_CLOUD_NAME
+        self._orig_key = cfg.CLOUDINARY_API_KEY
+        self._orig_secret = cfg.CLOUDINARY_API_SECRET
+
+    def tearDown(self):
+        import config as cfg
+        cfg.CLOUDINARY_CLOUD_NAME = self._orig_name
+        cfg.CLOUDINARY_API_KEY = self._orig_key
+        cfg.CLOUDINARY_API_SECRET = self._orig_secret
+
+    def test_not_configured_when_all_empty(self):
+        import config as cfg
+        cfg.CLOUDINARY_CLOUD_NAME = ""
+        cfg.CLOUDINARY_API_KEY = ""
+        cfg.CLOUDINARY_API_SECRET = ""
+        from services import cloudinary_upload
+        self.assertFalse(cloudinary_upload.is_configured())
+
+    def test_not_configured_when_any_missing(self):
+        import config as cfg
+        cfg.CLOUDINARY_CLOUD_NAME = "demo"
+        cfg.CLOUDINARY_API_KEY = "key"
+        cfg.CLOUDINARY_API_SECRET = ""
+        from services import cloudinary_upload
+        self.assertFalse(cloudinary_upload.is_configured())
+
+    def test_configured_when_all_set(self):
+        import config as cfg
+        cfg.CLOUDINARY_CLOUD_NAME = "demo"
+        cfg.CLOUDINARY_API_KEY = "123456"
+        cfg.CLOUDINARY_API_SECRET = "abc_secret"
+        from services import cloudinary_upload
+        self.assertTrue(cloudinary_upload.is_configured())
+
+
+class TestCloudinaryUploadImage(unittest.TestCase):
+
+    def setUp(self):
+        import config as cfg
+        self._orig_name = cfg.CLOUDINARY_CLOUD_NAME
+        self._orig_key = cfg.CLOUDINARY_API_KEY
+        self._orig_secret = cfg.CLOUDINARY_API_SECRET
+        cfg.CLOUDINARY_CLOUD_NAME = "demo"
+        cfg.CLOUDINARY_API_KEY = "123456"
+        cfg.CLOUDINARY_API_SECRET = "abc_secret"
+
+    def tearDown(self):
+        import config as cfg
+        cfg.CLOUDINARY_CLOUD_NAME = self._orig_name
+        cfg.CLOUDINARY_API_KEY = self._orig_key
+        cfg.CLOUDINARY_API_SECRET = self._orig_secret
+
+    def test_returns_none_when_not_configured(self):
+        import config as cfg
+        cfg.CLOUDINARY_CLOUD_NAME = ""
+        from services import cloudinary_upload
+        result = cloudinary_upload.upload_image("/some/path.jpg")
+        self.assertIsNone(result)
+
+    @patch("services.cloudinary_upload.cloudinary.uploader.upload")
+    def test_returns_secure_url_on_success(self, mock_upload):
+        mock_upload.return_value = {
+            "secure_url": "https://res.cloudinary.com/demo/image/upload/photo.jpg",
+            "url": "http://res.cloudinary.com/demo/image/upload/photo.jpg",
+        }
+        from services import cloudinary_upload
+        url = cloudinary_upload.upload_image("/tmp/photo.jpg")
+        self.assertEqual(url, "https://res.cloudinary.com/demo/image/upload/photo.jpg")
+
+    @patch("services.cloudinary_upload.cloudinary.uploader.upload")
+    def test_returns_none_on_exception(self, mock_upload):
+        mock_upload.side_effect = Exception("network error")
+        from services import cloudinary_upload
+        result = cloudinary_upload.upload_image("/tmp/photo.jpg")
+        self.assertIsNone(result)
+
+    @patch("services.cloudinary_upload.cloudinary.uploader.upload")
+    def test_upload_uses_correct_folder(self, mock_upload):
+        mock_upload.return_value = {"secure_url": "https://res.cloudinary.com/x.jpg"}
+        from services import cloudinary_upload
+        cloudinary_upload.upload_image("/tmp/photo.jpg")
+        call_kwargs = mock_upload.call_args[1]
+        self.assertEqual(call_kwargs.get("folder"), "realestate-bot")
 
 
 # ── social_poster.post_listing() Zapier routing ───────────────────────────────
@@ -166,7 +249,6 @@ class TestSocialPosterZapierRouting(unittest.TestCase):
 
     @patch("services.zapier.requests.post")
     def test_zapier_takes_priority_over_ghl(self, mock_post):
-        """When both Zapier and GHL are configured, Zapier wins."""
         import config as cfg
         cfg.ZAPIER_WEBHOOK_URL = "https://hooks.zapier.com/hooks/catch/abc/"
         cfg.GHL_API_KEY = "ghl_key"
@@ -180,6 +262,23 @@ class TestSocialPosterZapierRouting(unittest.TestCase):
         results = social_poster.post_listing("Great property!")
         self.assertIn("zapier", results)
         self.assertNotIn("ghl", results)
+
+    @patch("services.zapier.requests.post")
+    def test_zapier_uses_listing_dict_when_provided(self, mock_post):
+        """When a listing dict is passed, it is forwarded directly to Zapier."""
+        import config as cfg
+        cfg.ZAPIER_WEBHOOK_URL = "https://hooks.zapier.com/hooks/catch/abc/"
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.raise_for_status = MagicMock()
+        mock_post.return_value = mock_resp
+
+        from services import social_poster
+        listing = {"description": "House", "price": "$500k", "image_url": "https://x.com/img.jpg"}
+        social_poster.post_listing("House", listing=listing)
+        sent = mock_post.call_args[1]["json"]
+        self.assertEqual(sent["price"], "$500k")
+        self.assertEqual(sent["image_url"], "https://x.com/img.jpg")
 
     @patch("services.ghl.post_to_social_planner")
     def test_post_listing_falls_back_to_ghl_when_zapier_not_configured(
@@ -227,7 +326,27 @@ class TestConfirmCallbackZapierPath(unittest.IsolatedAsyncioTestCase):
         import config as cfg
         cfg.ZAPIER_WEBHOOK_URL = self._orig_zapier
 
-    async def _run_confirm(self, zapier_result: dict):
+    def _make_context(self, extra: dict | None = None):
+        import bot.telegram_bot as tb
+        data = {
+            tb.CTX_CAPTION:        "Beautiful house!",
+            tb.CTX_DESCRIPTION:    "3-bed home",
+            tb.CTX_MEDIA_PATH:     None,
+            tb.CTX_MEDIA_TYPE:     "photo",
+            tb.CTX_PRICE:          "$650,000",
+            tb.CTX_LOCATION:       "Ottawa, ON",
+            tb.CTX_BEDROOMS:       "3",
+            tb.CTX_BATHROOMS:      "2",
+            tb.CTX_CONTACT_PHONE:  "613-555-1234",
+        }
+        if extra:
+            data.update(extra)
+        context = MagicMock()
+        context.user_data = data
+        context.bot.send_message = AsyncMock()
+        return context
+
+    async def _run_confirm(self, zapier_result: dict, context=None):
         import bot.telegram_bot as tb
         import config as cfg
         cfg.ZAPIER_WEBHOOK_URL = "https://hooks.zapier.com/hooks/catch/abc/"
@@ -236,16 +355,12 @@ class TestConfirmCallbackZapierPath(unittest.IsolatedAsyncioTestCase):
         query = AsyncMock()
         query.data = "confirm_post"
         update.callback_query = query
-        context = MagicMock()
-        context.user_data = {
-            tb.CTX_CAPTION: "Beautiful house!",
-            tb.CTX_MEDIA_PATH: None,
-            tb.CTX_MEDIA_TYPE: "photo",
-        }
-        context.bot.send_message = AsyncMock()
+        if context is None:
+            context = self._make_context()
 
         with patch("bot.telegram_bot.zapier_service.is_configured", return_value=True), \
-             patch("bot.telegram_bot.zapier_service.post_to_social",
+             patch("bot.telegram_bot.cloudinary_upload.is_configured", return_value=False), \
+             patch("bot.telegram_bot.zapier_service.post_listing",
                    return_value=zapier_result):
             from telegram.ext import ConversationHandler
             result = await tb.handle_confirm_callback(update, context)
@@ -271,21 +386,73 @@ class TestConfirmCallbackZapierPath(unittest.IsolatedAsyncioTestCase):
         self.assertIn("❌", text)
         self.assertIn("timeout", text)
 
+    async def test_confirm_builds_structured_listing_payload(self):
+        """The confirm callback must pass listing fields to zapier_service.post_listing."""
+        import bot.telegram_bot as tb
+        import config as cfg
+        cfg.ZAPIER_WEBHOOK_URL = "https://hooks.zapier.com/hooks/catch/abc/"
+        update = MagicMock()
+        update.effective_chat.id = 123
+        query = AsyncMock()
+        query.data = "confirm_post"
+        update.callback_query = query
+        context = self._make_context()
+        mock_post = MagicMock(return_value={"success": True, "status_code": 200})
+
+        with patch("bot.telegram_bot.zapier_service.is_configured", return_value=True), \
+             patch("bot.telegram_bot.cloudinary_upload.is_configured", return_value=False), \
+             patch("bot.telegram_bot.zapier_service.post_listing", mock_post):
+            await tb.handle_confirm_callback(update, context)
+
+        listing = mock_post.call_args[0][0]
+        self.assertEqual(listing["price"], "$650,000")
+        self.assertEqual(listing["location"], "Ottawa, ON")
+        self.assertEqual(listing["bedrooms"], "3")
+        self.assertEqual(listing["bathrooms"], "2")
+        self.assertEqual(listing["contact_phone"], "613-555-1234")
+
+    async def test_cloudinary_url_included_in_payload_when_upload_succeeds(self):
+        """When Cloudinary upload succeeds, image_url must appear in the payload."""
+        import bot.telegram_bot as tb
+        import config as cfg
+        import tempfile, os
+        cfg.ZAPIER_WEBHOOK_URL = "https://hooks.zapier.com/hooks/catch/abc/"
+
+        tmp = tempfile.NamedTemporaryFile(suffix=".jpg", delete=False)
+        tmp.write(b"\xff\xd8\xff")
+        tmp.close()
+        tmp_name = tmp.name
+
+        update = MagicMock()
+        update.effective_chat.id = 123
+        query = AsyncMock()
+        query.data = "confirm_post"
+        update.callback_query = query
+        context = self._make_context({
+            tb.CTX_MEDIA_PATH: tmp_name,
+            tb.CTX_MEDIA_TYPE: "photo",
+        })
+        mock_post = MagicMock(return_value={"success": True, "status_code": 200})
+        public_url = "https://res.cloudinary.com/demo/photo.jpg"
+
+        with patch("bot.telegram_bot.zapier_service.is_configured", return_value=True), \
+             patch("bot.telegram_bot.cloudinary_upload.is_configured", return_value=True), \
+             patch("bot.telegram_bot.cloudinary_upload.upload_image", return_value=public_url), \
+             patch("bot.telegram_bot.zapier_service.post_listing", mock_post):
+            await tb.handle_confirm_callback(update, context)
+
+        # _cleanup_media already deleted the file – that is correct behavior
+        listing = mock_post.call_args[0][0]
+        self.assertEqual(listing.get("image_url"), public_url)
+
     async def test_confirm_without_zapier_falls_through_to_ghl(self):
-        """When Zapier is not configured, GHL path should be tried next."""
         import bot.telegram_bot as tb
         update = MagicMock()
         update.effective_chat.id = 123
         query = AsyncMock()
         query.data = "confirm_post"
         update.callback_query = query
-        context = MagicMock()
-        context.user_data = {
-            tb.CTX_CAPTION: "House",
-            tb.CTX_MEDIA_PATH: None,
-            tb.CTX_MEDIA_TYPE: "photo",
-        }
-        context.bot.send_message = AsyncMock()
+        context = self._make_context()
         from telegram.ext import ConversationHandler
         with patch("bot.telegram_bot.zapier_service.is_configured", return_value=False), \
              patch("bot.telegram_bot.ghl_service.is_configured", return_value=True), \
@@ -293,6 +460,89 @@ class TestConfirmCallbackZapierPath(unittest.IsolatedAsyncioTestCase):
                    return_value={"success": True, "post_id": "p1"}):
             result = await tb.handle_confirm_callback(update, context)
         self.assertEqual(result, ConversationHandler.END)
+
+
+# ── Listing detail collection steps ──────────────────────────────────────────
+
+class TestListingDetailSteps(unittest.IsolatedAsyncioTestCase):
+    """Test that each step handler stores the value and returns the next state."""
+
+    def setUp(self):
+        import bot.telegram_bot as tb
+        tb._bot_paused = False
+
+    async def _send_text(self, handler, text: str, user_data: dict | None = None):
+        import bot.telegram_bot as tb
+        update = MagicMock()
+        update.effective_message.text = text
+        update.effective_message.reply_text = AsyncMock()
+        context = MagicMock()
+        context.user_data = user_data if user_data is not None else {}
+        state = await handler(update, context)
+        return state, context
+
+    async def test_handle_price_stores_price_and_returns_location(self):
+        import bot.telegram_bot as tb
+        state, ctx = await self._send_text(tb.handle_price, "$650,000")
+        self.assertEqual(ctx.user_data[tb.CTX_PRICE], "$650,000")
+        self.assertEqual(state, tb.AWAITING_LOCATION)
+
+    async def test_handle_location_stores_location_and_returns_bedrooms(self):
+        import bot.telegram_bot as tb
+        state, ctx = await self._send_text(tb.handle_location, "Ottawa, ON")
+        self.assertEqual(ctx.user_data[tb.CTX_LOCATION], "Ottawa, ON")
+        self.assertEqual(state, tb.AWAITING_BEDROOMS)
+
+    async def test_handle_bedrooms_stores_bedrooms_and_returns_bathrooms(self):
+        import bot.telegram_bot as tb
+        state, ctx = await self._send_text(tb.handle_bedrooms, "3")
+        self.assertEqual(ctx.user_data[tb.CTX_BEDROOMS], "3")
+        self.assertEqual(state, tb.AWAITING_BATHROOMS)
+
+    async def test_handle_bathrooms_stores_bathrooms_and_returns_contact_phone(self):
+        import bot.telegram_bot as tb
+        state, ctx = await self._send_text(tb.handle_bathrooms, "2")
+        self.assertEqual(ctx.user_data[tb.CTX_BATHROOMS], "2")
+        self.assertEqual(state, tb.AWAITING_CONTACT_PHONE)
+
+    async def test_handle_contact_phone_stores_phone_and_returns_confirm(self):
+        import bot.telegram_bot as tb
+        user_data = {
+            tb.CTX_CAPTION: "Great house",
+            tb.CTX_PRICE: "$500k",
+            tb.CTX_LOCATION: "Toronto",
+            tb.CTX_BEDROOMS: "3",
+            tb.CTX_BATHROOMS: "2",
+        }
+        state, ctx = await self._send_text(tb.handle_contact_phone, "416-555-9999", user_data)
+        self.assertEqual(ctx.user_data[tb.CTX_CONTACT_PHONE], "416-555-9999")
+        self.assertEqual(state, tb.AWAITING_CONFIRM)
+
+    async def test_handle_description_goes_to_price_when_zapier_configured(self):
+        import bot.telegram_bot as tb
+        update = MagicMock()
+        update.effective_message.text = "3-bed house in Ottawa"
+        update.effective_message.reply_text = AsyncMock()
+        context = MagicMock()
+        context.user_data = {}
+        with patch("bot.telegram_bot.zapier_service.is_configured", return_value=True), \
+             patch("bot.telegram_bot.lead_qualifier.generate_listing_caption",
+                   return_value="Great listing!"):
+            state = await tb.handle_description(update, context)
+        self.assertEqual(state, tb.AWAITING_PRICE)
+
+    async def test_handle_description_goes_to_confirm_when_zapier_not_configured(self):
+        import bot.telegram_bot as tb
+        update = MagicMock()
+        update.effective_message.text = "3-bed house"
+        update.effective_message.reply_text = AsyncMock()
+        context = MagicMock()
+        context.user_data = {}
+        with patch("bot.telegram_bot.zapier_service.is_configured", return_value=False), \
+             patch("bot.telegram_bot.lead_qualifier.generate_listing_caption",
+                   return_value="Caption"):
+            state = await tb.handle_description(update, context)
+        self.assertEqual(state, tb.AWAITING_CONFIRM)
 
 
 # ── /zapier command ───────────────────────────────────────────────────────────
@@ -324,15 +574,16 @@ class TestCmdZapier(unittest.IsolatedAsyncioTestCase):
         self.assertIn("Setup Steps", reply)
         self.assertIn("Catch Hook", reply)
 
-    async def test_configured_shows_status(self):
+    async def test_configured_shows_status_and_json_schema(self):
         import config as cfg
         cfg.ZAPIER_WEBHOOK_URL = "https://hooks.zapier.com/hooks/catch/abc/"
         update = await self._call_cmd_zapier()
         reply = update.effective_message.reply_text.call_args[0][0]
         self.assertIn("configured", reply)
         self.assertIn("✅", reply)
+        self.assertIn("image_url", reply)
 
-    async def test_zapier_not_authorised_is_blocked(self):
+    async def test_not_authorised_agent_is_blocked(self):
         update = await self._call_cmd_zapier(chat_id=999999)
         self.assertIsNotNone(update)
 

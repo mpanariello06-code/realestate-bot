@@ -173,23 +173,35 @@ def post_listing(
     image_path: str | None = None,
     image_url: str | None = None,
     video_path: str | None = None,
+    listing: dict | None = None,
 ) -> dict[str, dict]:
     """
     Post a property listing to all configured social platforms.
 
     Priority order:
-      1. Zapier webhook (when ZAPIER_WEBHOOK_URL is set) – sends to Facebook
-         and Instagram via your Zapier Zap.
+      1. Zapier webhook (when ZAPIER_WEBHOOK_URL is set) – sends the full
+         structured listing JSON to your Zapier Zap which publishes to
+         Facebook and Instagram.
       2. GHL Social Planner (when GHL_API_KEY + GHL_LOCATION_ID are set) –
          publishes via Go High Level.
       3. Direct Facebook/Instagram Graph API (always-available fallback).
+
+    Parameters
+    ----------
+    caption    : AI-generated caption / description text.
+    image_path : Local path to the image (used by the GHL / direct API paths).
+    image_url  : Public image URL (used by the direct Instagram API path).
+    video_path : Local path to a video (used by the GHL / direct API paths).
+    listing    : Structured listing dict for the Zapier path.  Must contain
+                 ``description``, ``price``, ``location``, ``bedrooms``,
+                 ``bathrooms``, ``contact_phone``, and optionally ``image_url``.
 
     Returns a dict mapping platform name → result dict.
     """
     # ── Zapier path (preferred) ───────────────────────────────────────────────
     if zapier_service.is_configured():
-        media = image_path or video_path
-        result = zapier_service.post_to_social(caption, media)
+        payload = listing or {"description": caption}
+        result = zapier_service.post_listing(payload)
         return {"zapier": result}
 
     # ── GHL Social Planner path ───────────────────────────────────────────────

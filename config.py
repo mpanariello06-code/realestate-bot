@@ -75,6 +75,14 @@ FACEBOOK_APP_SECRET: str = os.getenv("FACEBOOK_APP_SECRET", "")
 # direct Facebook/Instagram API.
 ZAPIER_WEBHOOK_URL: str = os.getenv("ZAPIER_WEBHOOK_URL", "")
 
+# ── Cloudinary ────────────────────────────────────────────────────────────────
+# Cloudinary stores listing photos and returns a public URL that Zapier (and
+# Instagram/Facebook) can download when publishing the post.
+# Get these from cloudinary.com → Dashboard → Product Environment Credentials.
+CLOUDINARY_CLOUD_NAME: str = os.getenv("CLOUDINARY_CLOUD_NAME", "")
+CLOUDINARY_API_KEY: str = os.getenv("CLOUDINARY_API_KEY", "")
+CLOUDINARY_API_SECRET: str = os.getenv("CLOUDINARY_API_SECRET", "")
+
 # ── Go High Level (GHL) ───────────────────────────────────────────────────────
 # Private Integration Key (or Agency API key) from GHL Settings → Integrations.
 GHL_API_KEY: str = os.getenv("GHL_API_KEY", "")

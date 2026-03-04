@@ -51,6 +51,7 @@ from services import lead_qualifier, sheets, social_poster
 from services.weekly_report import send_weekly_report
 from services import ghl as ghl_service
 from services import zapier as zapier_service
+from services import cloudinary_upload
 
 logger = logging.getLogger(__name__)
 
@@ -67,7 +68,12 @@ _bot_paused: bool = False
     AWAITING_CONFIRM,
     AWAITING_QUALIFY_MESSAGE,
     AWAITING_QUALIFY_SAVE,
-) = range(7)
+    AWAITING_PRICE,
+    AWAITING_LOCATION,
+    AWAITING_BEDROOMS,
+    AWAITING_BATHROOMS,
+    AWAITING_CONTACT_PHONE,
+) = range(12)
 
 # Context keys
 CTX_MEDIA_PATH = "media_path"
@@ -76,6 +82,11 @@ CTX_DESCRIPTION = "description"
 CTX_CAPTION = "caption"
 CTX_PLATFORM = "platform"
 CTX_QUALIFY_RESULT = "qualify_result"
+CTX_PRICE = "price"
+CTX_LOCATION = "location"
+CTX_BEDROOMS = "bedrooms"
+CTX_BATHROOMS = "bathrooms"
+CTX_CONTACT_PHONE = "contact_phone"
 
 
 # ── Guards ────────────────────────────────────────────────────────────────────
@@ -447,11 +458,27 @@ async def cmd_zapier(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     ]
 
     if configured:
+        cloudinary_ok = cloudinary_upload.is_configured()
+        cloudinary_status = "✅ Cloudinary configured" if cloudinary_ok else "⚠️ Cloudinary not set (no image_url)"
+        lines.append(f"Cloudinary: {cloudinary_status}")
         lines.append(
             "\n*How it works:*\n"
-            "When you tap *Post Listing*, the bot sends the caption and "
-            "photo to your Zapier webhook.  Zapier then publishes the post "
-            "to Facebook and/or Instagram automatically."
+            "When you tap *Post Listing*, the bot:\n"
+            "1️⃣ Collects listing details (price, location, bedrooms, bathrooms, phone)\n"
+            "2️⃣ Uploads the photo to Cloudinary to get a public URL\n"
+            "3️⃣ Sends structured JSON to Zapier:\n"
+            "```\n"
+            "{\n"
+            '  "description":   "...",\n'
+            '  "price":         "...",\n'
+            '  "location":      "...",\n'
+            '  "bedrooms":      "...",\n'
+            '  "bathrooms":     "...",\n'
+            '  "contact_phone": "...",\n'
+            '  "image_url":     "https://res.cloudinary.com/..."\n'
+            "}\n"
+            "```\n"
+            "Zapier then publishes to Facebook & Instagram automatically."
         )
     else:
         lines.append(
@@ -461,12 +488,17 @@ async def cmd_zapier(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
             "   Copy the generated webhook URL.\n\n"
             "2️⃣ Add your posting actions, e.g.:\n"
             "   Action 1: *Facebook Pages → Create Page Post*\n"
-            "   Map `caption` to the post body.\n"
+            "   Map `description` + `price` to the post body.\n"
             "   Action 2: *Instagram for Business → Create Photo Post*\n"
-            "   Map `caption` to the caption, `image` to the photo.\n\n"
-            "3️⃣ Add to your `.env` file:\n"
+            "   Map `image_url` to the Photo, `description` to the Caption.\n\n"
+            "3️⃣ Set up Cloudinary (for photo uploads):\n"
+            "   Register free at cloudinary.com, then add to `.env`:\n"
+            "   `CLOUDINARY_CLOUD_NAME=...`\n"
+            "   `CLOUDINARY_API_KEY=...`\n"
+            "   `CLOUDINARY_API_SECRET=...`\n\n"
+            "4️⃣ Add to your `.env` file:\n"
             "   `ZAPIER_WEBHOOK_URL=https://hooks.zapier.com/hooks/catch/...`\n\n"
-            "4️⃣ Restart the bot and run `/zapier` again to confirm."
+            "5️⃣ Restart the bot and run `/zapier` again to confirm."
         )
 
     await update.effective_message.reply_text(
@@ -526,7 +558,7 @@ async def handle_media(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
 
 
 async def handle_description(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Receive the description, generate a caption, ask for platform."""
+    """Receive the description, generate a caption, then collect listing details (Zapier) or confirm."""
     description = update.effective_message.text or ""
     context.user_data[CTX_DESCRIPTION] = description
 
@@ -534,9 +566,82 @@ async def handle_description(update: Update, context: ContextTypes.DEFAULT_TYPE)
     caption = lead_qualifier.generate_listing_caption(description)
     context.user_data[CTX_CAPTION] = caption
 
+    # When Zapier is configured, collect structured listing fields before posting
+    if zapier_service.is_configured():
+        await update.effective_message.reply_text(
+            f"*📝 Generated Caption:*\n\n{caption}\n\n"
+            "Now let's collect a few more details for the post.\n\n"
+            "💰 What is the *asking price*? (e.g. $650,000 or 650k)",
+            parse_mode=ParseMode.MARKDOWN,
+        )
+        return AWAITING_PRICE
+
     await update.effective_message.reply_text(
         f"*📝 Generated Caption:*\n\n{caption}\n\n"
         "Choose an option:",
+        parse_mode=ParseMode.MARKDOWN,
+        reply_markup=confirm_post_keyboard(),
+    )
+    return AWAITING_CONFIRM
+
+
+async def handle_price(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Receive the price and ask for location."""
+    context.user_data[CTX_PRICE] = update.effective_message.text or ""
+    await update.effective_message.reply_text(
+        "📍 What is the *location / city*? (e.g. Ottawa, ON)",
+        parse_mode=ParseMode.MARKDOWN,
+    )
+    return AWAITING_LOCATION
+
+
+async def handle_location(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Receive the location and ask for bedroom count."""
+    context.user_data[CTX_LOCATION] = update.effective_message.text or ""
+    await update.effective_message.reply_text(
+        "🛏 How many *bedrooms*? (e.g. 3)",
+        parse_mode=ParseMode.MARKDOWN,
+    )
+    return AWAITING_BEDROOMS
+
+
+async def handle_bedrooms(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Receive the bedroom count and ask for bathroom count."""
+    context.user_data[CTX_BEDROOMS] = update.effective_message.text or ""
+    await update.effective_message.reply_text(
+        "🚿 How many *bathrooms*? (e.g. 2)",
+        parse_mode=ParseMode.MARKDOWN,
+    )
+    return AWAITING_BATHROOMS
+
+
+async def handle_bathrooms(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Receive the bathroom count and ask for contact phone."""
+    context.user_data[CTX_BATHROOMS] = update.effective_message.text or ""
+    await update.effective_message.reply_text(
+        "📞 What is the *contact phone number*? (e.g. 613-555-1234)",
+        parse_mode=ParseMode.MARKDOWN,
+    )
+    return AWAITING_CONTACT_PHONE
+
+
+async def handle_contact_phone(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Receive the contact phone and show the final confirmation."""
+    context.user_data[CTX_CONTACT_PHONE] = update.effective_message.text or ""
+    caption = context.user_data.get(CTX_CAPTION, "")
+
+    summary = (
+        f"*📋 Listing Summary:*\n\n"
+        f"📝 *Caption:* {caption}\n"
+        f"💰 *Price:* {context.user_data.get(CTX_PRICE, '—')}\n"
+        f"📍 *Location:* {context.user_data.get(CTX_LOCATION, '—')}\n"
+        f"🛏 *Bedrooms:* {context.user_data.get(CTX_BEDROOMS, '—')}\n"
+        f"🚿 *Bathrooms:* {context.user_data.get(CTX_BATHROOMS, '—')}\n"
+        f"📞 *Phone:* {context.user_data.get(CTX_CONTACT_PHONE, '—')}\n\n"
+        "Confirm to post this to Facebook & Instagram via Zapier:"
+    )
+    await update.effective_message.reply_text(
+        summary,
         parse_mode=ParseMode.MARKDOWN,
         reply_markup=confirm_post_keyboard(),
     )
@@ -571,14 +676,44 @@ async def handle_confirm_callback(update: Update, context: ContextTypes.DEFAULT_
         # ── Zapier path (preferred) ───────────────────────────────────────────
         if zapier_service.is_configured():
             await query.answer("🚀 Sending to Zapier…")
-            caption = context.user_data.get(CTX_CAPTION, "")
+            await query.edit_message_text("🚀 Uploading photo & sending to Zapier…")
+
             image_path = context.user_data.get(CTX_MEDIA_PATH)
             media_type = context.user_data.get(CTX_MEDIA_TYPE, "photo")
-            await query.edit_message_text("🚀 Sending to Zapier…")
-            res = zapier_service.post_to_social(
-                caption,
-                image_path if media_type == "photo" else None,
+
+            # Upload image to Cloudinary to get a public URL
+            image_url = ""
+            if image_path and media_type == "photo":
+                uploaded_url = cloudinary_upload.upload_image(image_path)
+                if uploaded_url:
+                    image_url = uploaded_url
+                elif not cloudinary_upload.is_configured():
+                    image_url = ""  # Cloudinary not set up – omit the field
+                else:
+                    # Upload failed – warn but continue
+                    await context.bot.send_message(
+                        chat_id=update.effective_chat.id,
+                        text="⚠️ Photo upload to Cloudinary failed. Posting without image.",
+                    )
+
+            # Build the structured listing payload
+            description = (
+                context.user_data.get(CTX_DESCRIPTION)
+                or context.user_data.get(CTX_CAPTION)
+                or ""
             )
+            listing: dict = {
+                "description":   description,
+                "price":         context.user_data.get(CTX_PRICE, ""),
+                "location":      context.user_data.get(CTX_LOCATION, ""),
+                "bedrooms":      context.user_data.get(CTX_BEDROOMS, ""),
+                "bathrooms":     context.user_data.get(CTX_BATHROOMS, ""),
+                "contact_phone": context.user_data.get(CTX_CONTACT_PHONE, ""),
+            }
+            if image_url:
+                listing["image_url"] = image_url
+
+            res = zapier_service.post_listing(listing)
             result_text = (
                 "✅ Zapier: Post sent! Zapier will publish it to Facebook & Instagram."
                 if res.get("success")
@@ -697,6 +832,11 @@ def _cleanup_media(context: ContextTypes.DEFAULT_TYPE) -> None:
     context.user_data.pop(CTX_DESCRIPTION, None)
     context.user_data.pop(CTX_CAPTION, None)
     context.user_data.pop(CTX_PLATFORM, None)
+    context.user_data.pop(CTX_PRICE, None)
+    context.user_data.pop(CTX_LOCATION, None)
+    context.user_data.pop(CTX_BEDROOMS, None)
+    context.user_data.pop(CTX_BATHROOMS, None)
+    context.user_data.pop(CTX_CONTACT_PHONE, None)
 
 
 # ── Lead action callbacks ─────────────────────────────────────────────────────
@@ -870,6 +1010,21 @@ def build_application() -> Application:
             ],
             AWAITING_DESCRIPTION: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, handle_description),
+            ],
+            AWAITING_PRICE: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, handle_price),
+            ],
+            AWAITING_LOCATION: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, handle_location),
+            ],
+            AWAITING_BEDROOMS: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, handle_bedrooms),
+            ],
+            AWAITING_BATHROOMS: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, handle_bathrooms),
+            ],
+            AWAITING_CONTACT_PHONE: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, handle_contact_phone),
             ],
             AWAITING_CONFIRM: [
                 CallbackQueryHandler(
