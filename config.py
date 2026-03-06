@@ -74,6 +74,11 @@ FACEBOOK_APP_SECRET: str = os.getenv("FACEBOOK_APP_SECRET", "")
 # and/or Instagram.  Leave blank to fall back to GHL Social Planner or the
 # direct Facebook/Instagram API.
 ZAPIER_WEBHOOK_URL: str = os.getenv("ZAPIER_WEBHOOK_URL", "")
+# Separate "Catch Hook" URL used by the "📋 All Leads" button.  When set,
+# tapping the button POSTs {"action": "get_all_leads"} to this webhook and
+# the response JSON is parsed for a "leads" list to display.  Leave blank to
+# fall back to showing all leads directly from the local Google Sheet.
+ZAPIER_ALL_LEADS_WEBHOOK_URL: str = os.getenv("ZAPIER_ALL_LEADS_WEBHOOK_URL", "")
 
 # ── Cloudinary ────────────────────────────────────────────────────────────────
 # Cloudinary stores listing photos and returns a public URL that Zapier (and

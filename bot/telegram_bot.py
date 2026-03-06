@@ -89,6 +89,9 @@ CTX_BEDROOMS = "bedrooms"
 CTX_BATHROOMS = "bathrooms"
 CTX_CONTACT_PHONE = "contact_phone"
 
+# Maximum number of lead cards shown per /leads or "All Leads" reply
+_MAX_DISPLAYED_LEADS: int = 10
+
 
 # ── Guards ────────────────────────────────────────────────────────────────────
 
@@ -341,7 +344,7 @@ async def cmd_leads(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         )
         return
 
-    for i, lead in enumerate(leads[-10:], 1):  # show last 10
+    for i, lead in enumerate(leads[-_MAX_DISPLAYED_LEADS:], 1):  # show last N
         name = f"{lead.get('first_name', '')} {lead.get('last_name', '')}".strip() or "Unknown"
         email = lead.get("email") or "N/A"
         phone = lead.get("phone") or "N/A"
@@ -362,6 +365,89 @@ async def cmd_leads(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         )
         await update.effective_message.reply_text(
             text,
+            parse_mode=ParseMode.MARKDOWN,
+            reply_markup=lead_action_keyboard(i - 1),
+        )
+
+
+# ── All Leads (Zapier webhook or local sheet) ──────────────────────────────────
+
+def _format_lead_text(i: int, lead: dict) -> str:
+    """Render a single lead dict as a Telegram Markdown card.
+
+    Parameters
+    ----------
+    i : int
+        1-based display index shown as "Lead #i".
+    lead : dict
+        Lead record with the following keys (all optional, sensible defaults
+        are used when absent):
+        - ``first_name`` / ``last_name`` (str): contact name
+        - ``email`` (str): e-mail address
+        - ``phone`` (str): phone number
+        - ``intent`` (str): e.g. "buy", "sell", "rent"
+        - ``score`` (int | float): qualification score out of 100
+        - ``summary`` (str): short AI-generated summary
+        - ``status`` (str): e.g. "new", "contacted", "closed", "lost"
+    """
+    name = f"{lead.get('first_name', '')} {lead.get('last_name', '')}".strip() or "Unknown"
+    email = lead.get("email") or "N/A"
+    phone = lead.get("phone") or "N/A"
+    intent = lead.get("intent", "unknown").title()
+    score = lead.get("score", 0)
+    summary = lead.get("summary", "")
+    status = lead.get("status", "new").title()
+    return (
+        f"*Lead #{i}*\n"
+        f"👤 {name}\n"
+        f"📧 {email}\n"
+        f"📞 {phone}\n"
+        f"🏠 Intent: {intent}\n"
+        f"⭐ Score: {score}/100\n"
+        f"📝 {summary}\n"
+        f"📌 Status: {status}"
+    )
+
+
+async def cmd_all_leads(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """
+    Show all leads (qualified and unqualified).
+
+    If ``ZAPIER_ALL_LEADS_WEBHOOK_URL`` is configured the bot POSTs
+    ``{"action": "get_all_leads"}`` to that webhook and displays the leads
+    returned in the response.  Otherwise it falls back to fetching all leads
+    directly from the Google Sheet.
+    """
+    if not await _agent_only(update, context):
+        return
+
+    if zapier_service.is_all_leads_configured():
+        # ── Zapier path ────────────────────────────────────────────────────
+        await update.effective_message.reply_text("📋 Fetching all leads via Zapier…")
+        result = zapier_service.get_all_leads()
+        if not result.get("success"):
+            await update.effective_message.reply_text(
+                f"❌ Could not fetch leads: {result.get('error', 'unknown error')}"
+            )
+            return
+        leads = result.get("leads", [])
+        if not leads:
+            await update.effective_message.reply_text(
+                "No leads found. 🚀"
+            )
+            return
+    else:
+        # ── Local sheet fallback ───────────────────────────────────────────
+        leads = sheets.get_leads(qualified_only=False)
+        if not leads:
+            await update.effective_message.reply_text(
+                "No leads yet. Keep posting – they're coming! 🚀"
+            )
+            return
+
+    for i, lead in enumerate(leads[-_MAX_DISPLAYED_LEADS:], 1):  # show last N
+        await update.effective_message.reply_text(
+            _format_lead_text(i, lead),
             parse_mode=ParseMode.MARKDOWN,
             reply_markup=lead_action_keyboard(i - 1),
         )
@@ -972,7 +1058,7 @@ async def handle_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYP
     cmd_map = {
         "qualify_lead":    cmd_qualify,
         "qualified_leads": cmd_leads,
-        "all_leads":       cmd_leads,
+        "all_leads":       cmd_all_leads,
         "performance":     cmd_performance,
         "weekly_report":   cmd_report,
         "zapier_status":   cmd_zapier,

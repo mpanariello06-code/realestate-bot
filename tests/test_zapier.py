@@ -649,5 +649,219 @@ class TestKeyboardZapierButton(unittest.TestCase):
         self.assertNotIn("ghl_status", data)
 
 
+# ── services/zapier.py – get_all_leads() ──────────────────────────────────────
+
+class TestZapierGetAllLeads(unittest.TestCase):
+
+    def setUp(self):
+        import config as cfg
+        self._orig = getattr(cfg, "ZAPIER_ALL_LEADS_WEBHOOK_URL", "")
+        cfg.ZAPIER_ALL_LEADS_WEBHOOK_URL = "https://hooks.zapier.com/hooks/catch/abc/all/"
+
+    def tearDown(self):
+        import config as cfg
+        cfg.ZAPIER_ALL_LEADS_WEBHOOK_URL = self._orig
+
+    def test_is_all_leads_not_configured_when_empty(self):
+        import config as cfg
+        cfg.ZAPIER_ALL_LEADS_WEBHOOK_URL = ""
+        from services import zapier
+        self.assertFalse(zapier.is_all_leads_configured())
+
+    def test_is_all_leads_configured_when_url_set(self):
+        from services import zapier
+        self.assertTrue(zapier.is_all_leads_configured())
+
+    def test_returns_error_when_not_configured(self):
+        import config as cfg
+        cfg.ZAPIER_ALL_LEADS_WEBHOOK_URL = ""
+        from services import zapier
+        result = zapier.get_all_leads()
+        self.assertFalse(result["success"])
+        self.assertIn("not configured", result["error"])
+
+    @patch("services.zapier.requests.post")
+    def test_posts_get_all_leads_action(self, mock_post):
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.content = b'{"leads": []}'
+        mock_resp.json.return_value = {"leads": []}
+        mock_resp.raise_for_status = MagicMock()
+        mock_post.return_value = mock_resp
+
+        from services import zapier
+        zapier.get_all_leads()
+
+        call_args = mock_post.call_args
+        self.assertEqual(call_args[1]["json"], {"action": "get_all_leads"})
+
+    @patch("services.zapier.requests.post")
+    def test_returns_leads_from_response(self, mock_post):
+        leads_data = [
+            {"first_name": "Alice", "last_name": "Smith", "score": 85},
+            {"first_name": "Bob", "last_name": "Jones", "score": 72},
+        ]
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.content = b'{"leads": []}'
+        mock_resp.json.return_value = {"leads": leads_data}
+        mock_resp.raise_for_status = MagicMock()
+        mock_post.return_value = mock_resp
+
+        from services import zapier
+        result = zapier.get_all_leads()
+        self.assertTrue(result["success"])
+        self.assertEqual(result["leads"], leads_data)
+
+    @patch("services.zapier.requests.post")
+    def test_returns_empty_leads_list_when_missing_from_response(self, mock_post):
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.content = b'{}'
+        mock_resp.json.return_value = {}
+        mock_resp.raise_for_status = MagicMock()
+        mock_post.return_value = mock_resp
+
+        from services import zapier
+        result = zapier.get_all_leads()
+        self.assertTrue(result["success"])
+        self.assertEqual(result["leads"], [])
+
+    @patch("services.zapier.requests.post")
+    def test_returns_error_on_request_exception(self, mock_post):
+        mock_post.side_effect = _req.RequestException("network error")
+        from services import zapier
+        result = zapier.get_all_leads()
+        self.assertFalse(result["success"])
+        self.assertIn("network error", result["error"])
+
+
+# ── bot/telegram_bot.py – cmd_all_leads() ─────────────────────────────────────
+
+class TestCmdAllLeads(unittest.IsolatedAsyncioTestCase):
+
+    def _make_update(self, chat_id: int = 123):
+        update = MagicMock()
+        update.effective_chat.id = chat_id
+        update.effective_message.reply_text = AsyncMock()
+        return update
+
+    def _make_context(self):
+        return MagicMock()
+
+    async def test_all_leads_via_zapier_when_configured(self):
+        """When ZAPIER_ALL_LEADS_WEBHOOK_URL is set, leads come from Zapier."""
+        import bot.telegram_bot as tb
+        import config as cfg
+        cfg.ZAPIER_ALL_LEADS_WEBHOOK_URL = "https://hooks.zapier.com/hooks/catch/abc/all/"
+
+        leads = [{"first_name": "Alice", "last_name": "Smith", "score": 80,
+                  "email": "alice@example.com", "phone": "555-0001",
+                  "intent": "buy", "summary": "Ready now", "status": "new"}]
+
+        with patch("bot.telegram_bot.zapier_service.is_all_leads_configured", return_value=True), \
+             patch("bot.telegram_bot.zapier_service.get_all_leads",
+                   return_value={"success": True, "leads": leads}):
+            update = self._make_update()
+            await tb.cmd_all_leads(update, self._make_context())
+
+        calls = update.effective_message.reply_text.call_args_list
+        texts = [c[0][0] if c[0] else c[1].get("text", "") for c in calls]
+        # The lead card should have been sent
+        lead_texts = [t for t in texts if "Alice" in t or "Lead #" in t]
+        self.assertTrue(lead_texts, "Expected at least one lead card")
+
+    async def test_all_leads_sends_action_payload_to_zapier(self):
+        """Ensure the Zapier webhook receives {"action": "get_all_leads"}."""
+        import bot.telegram_bot as tb
+        import config as cfg
+        cfg.ZAPIER_ALL_LEADS_WEBHOOK_URL = "https://hooks.zapier.com/hooks/catch/abc/all/"
+
+        mock_get = MagicMock(return_value={"success": True, "leads": []})
+
+        with patch("bot.telegram_bot.zapier_service.is_all_leads_configured", return_value=True), \
+             patch("bot.telegram_bot.zapier_service.get_all_leads", mock_get):
+            update = self._make_update()
+            await tb.cmd_all_leads(update, self._make_context())
+
+        mock_get.assert_called_once()
+
+    async def test_all_leads_shows_no_leads_message_when_zapier_returns_empty(self):
+        import bot.telegram_bot as tb
+
+        with patch("bot.telegram_bot.zapier_service.is_all_leads_configured", return_value=True), \
+             patch("bot.telegram_bot.zapier_service.get_all_leads",
+                   return_value={"success": True, "leads": []}):
+            update = self._make_update()
+            await tb.cmd_all_leads(update, self._make_context())
+
+        reply_text = update.effective_message.reply_text.call_args[0][0]
+        self.assertIn("No leads", reply_text)
+
+    async def test_all_leads_shows_error_when_zapier_fails(self):
+        import bot.telegram_bot as tb
+
+        with patch("bot.telegram_bot.zapier_service.is_all_leads_configured", return_value=True), \
+             patch("bot.telegram_bot.zapier_service.get_all_leads",
+                   return_value={"success": False, "error": "timeout"}):
+            update = self._make_update()
+            await tb.cmd_all_leads(update, self._make_context())
+
+        reply_text = update.effective_message.reply_text.call_args[0][0]
+        self.assertIn("❌", reply_text)
+        self.assertIn("timeout", reply_text)
+
+    async def test_all_leads_falls_back_to_sheet_when_zapier_not_configured(self):
+        """Without ZAPIER_ALL_LEADS_WEBHOOK_URL, leads come from Google Sheets."""
+        import bot.telegram_bot as tb
+
+        sheet_leads = [{"first_name": "Bob", "last_name": "Jones", "score": 60,
+                        "email": "bob@example.com", "phone": "555-0002",
+                        "intent": "sell", "summary": "Moving soon", "status": "new"}]
+
+        with patch("bot.telegram_bot.zapier_service.is_all_leads_configured", return_value=False), \
+             patch("bot.telegram_bot.sheets.get_leads", return_value=sheet_leads):
+            update = self._make_update()
+            await tb.cmd_all_leads(update, self._make_context())
+
+        calls = update.effective_message.reply_text.call_args_list
+        texts = [c[0][0] if c[0] else c[1].get("text", "") for c in calls]
+        lead_texts = [t for t in texts if "Bob" in t or "Lead #" in t]
+        self.assertTrue(lead_texts, "Expected at least one lead card from sheet fallback")
+
+    async def test_all_leads_sheet_fallback_shows_all_leads_not_just_qualified(self):
+        """Sheet fallback must call get_leads(qualified_only=False)."""
+        import bot.telegram_bot as tb
+
+        with patch("bot.telegram_bot.zapier_service.is_all_leads_configured", return_value=False), \
+             patch("bot.telegram_bot.sheets.get_leads", return_value=[]) as mock_get_leads:
+            update = self._make_update()
+            await tb.cmd_all_leads(update, self._make_context())
+
+        mock_get_leads.assert_called_once_with(qualified_only=False)
+
+    async def test_all_leads_callback_routes_to_cmd_all_leads(self):
+        """The 'all_leads' callback_data must route to cmd_all_leads, not cmd_leads."""
+        import bot.telegram_bot as tb
+        import config as cfg
+        cfg.AGENT_CHAT_IDS = [123]
+
+        query = AsyncMock()
+        query.data = "all_leads"
+        query.answer = AsyncMock()
+        update = MagicMock()
+        update.effective_chat.id = 123
+        update.callback_query = query
+        update.effective_message.reply_text = AsyncMock()
+        context = MagicMock()
+
+        with patch("bot.telegram_bot.cmd_all_leads", new_callable=AsyncMock) as mock_all_leads, \
+             patch("bot.telegram_bot.cmd_leads", new_callable=AsyncMock) as mock_leads:
+            await tb.handle_menu_callback(update, context)
+
+        mock_all_leads.assert_awaited_once()
+        mock_leads.assert_not_called()
+
+
 if __name__ == "__main__":
     unittest.main()

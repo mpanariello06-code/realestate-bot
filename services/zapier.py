@@ -47,6 +47,48 @@ def is_configured() -> bool:
     return bool(config.ZAPIER_WEBHOOK_URL)
 
 
+def is_all_leads_configured() -> bool:
+    """Return True if the all-leads Zapier webhook URL is set in config."""
+    return bool(config.ZAPIER_ALL_LEADS_WEBHOOK_URL)
+
+
+def get_all_leads() -> dict:
+    """
+    Trigger the "all leads" Zapier Catch Hook and return the parsed leads.
+
+    POSTs ``{"action": "get_all_leads"}`` to ``ZAPIER_ALL_LEADS_WEBHOOK_URL``.
+    The Zap is expected to respond with a JSON body containing a ``"leads"``
+    list of lead objects (each with keys such as ``first_name``, ``last_name``,
+    ``email``, ``phone``, ``intent``, ``score``, ``summary``, ``status``).
+
+    Returns
+    -------
+    dict
+        On success: ``{"success": True, "leads": [...]}``
+        On failure: ``{"success": False, "error": "..."}``
+    """
+    if not config.ZAPIER_ALL_LEADS_WEBHOOK_URL:
+        return {"success": False, "error": "ZAPIER_ALL_LEADS_WEBHOOK_URL not configured"}
+
+    try:
+        resp = requests.post(
+            config.ZAPIER_ALL_LEADS_WEBHOOK_URL,
+            json={"action": "get_all_leads"},
+            timeout=30,
+        )
+        resp.raise_for_status()
+        data = resp.json() if resp.content else {}
+        leads = data.get("leads", [])
+        logger.info("Zapier all-leads hook triggered (status=%s, leads=%d)", resp.status_code, len(leads))
+        return {"success": True, "leads": leads}
+    except requests.RequestException as exc:
+        logger.error("Zapier all-leads webhook failed: %s", exc)
+        return {"success": False, "error": str(exc)}
+    except ValueError as exc:
+        logger.error("Zapier all-leads response is not valid JSON: %s", exc)
+        return {"success": False, "error": f"Invalid JSON response: {exc}"}
+
+
 def post_listing(listing: dict) -> dict:
     """
     Send a structured property listing to the configured Zapier Catch Hook.
