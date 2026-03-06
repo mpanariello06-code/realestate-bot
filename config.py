@@ -128,4 +128,10 @@ TELEGRAM_AUTO_REPLY_ENABLED: bool = os.getenv("TELEGRAM_AUTO_REPLY_ENABLED", "tr
 # bot messages such as the welcome screen and auto-replies.  A bundled default
 # banner is provided in the assets/ folder.  Set to an empty string to send
 # plain-text messages with no image attached.
-BOT_BANNER_IMAGE: str = os.getenv("BOT_BANNER_IMAGE", "assets/banner.jpg")
+#
+# The default is resolved as an *absolute* path relative to this config file so
+# the bot finds the image regardless of the working directory it is launched from.
+_DEFAULT_BANNER: str = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "assets", "banner.jpg"
+)
+BOT_BANNER_IMAGE: str = os.getenv("BOT_BANNER_IMAGE", _DEFAULT_BANNER)

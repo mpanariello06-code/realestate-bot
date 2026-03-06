@@ -15,6 +15,8 @@ os.environ.setdefault("TELEGRAM_BOT_TOKEN", "test")
 os.environ.setdefault("AGENT_CHAT_IDS", "123")
 os.environ.setdefault("OPENAI_API_KEY", "test-key")
 
+import config as cfg
+
 
 def _make_update(chat_id: int) -> MagicMock:
     """Build a minimal fake telegram.Update with the given chat_id."""
@@ -685,6 +687,28 @@ class TestSendWithBanner(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(call_kwargs["caption"], "We have many great properties!")
         finally:
             os.unlink(tmp_path)
+
+
+class TestBannerConfig(unittest.TestCase):
+    """Tests for the BOT_BANNER_IMAGE configuration."""
+
+    def test_default_banner_path_is_absolute(self):
+        """The default BOT_BANNER_IMAGE must be an absolute path so the bot
+        can find the file regardless of the working directory it is started from."""
+        # If no override is set in the environment the default should be absolute
+        if not os.environ.get("BOT_BANNER_IMAGE"):
+            self.assertTrue(
+                os.path.isabs(cfg.BOT_BANNER_IMAGE),
+                f"Expected an absolute path but got: {cfg.BOT_BANNER_IMAGE!r}",
+            )
+
+    def test_default_banner_file_exists(self):
+        """The bundled banner image must exist at the default path."""
+        if not os.environ.get("BOT_BANNER_IMAGE"):
+            self.assertTrue(
+                os.path.exists(cfg.BOT_BANNER_IMAGE),
+                f"Banner file not found at: {cfg.BOT_BANNER_IMAGE!r}",
+            )
 
 
 if __name__ == "__main__":

@@ -177,10 +177,11 @@ async def _send_with_banner(
                 reply_markup=reply_markup,
             )
             return
-        except Exception:
+        except Exception as exc:
             logger.warning(
-                "_send_with_banner: could not send photo (%s), falling back to text.",
+                "_send_with_banner: could not send photo (%s): %s — falling back to text.",
                 banner,
+                exc,
             )
     await message.reply_text(text, parse_mode=parse_mode, reply_markup=reply_markup)
 
@@ -213,10 +214,11 @@ async def _bot_send_with_banner(
                 reply_markup=reply_markup,
             )
             return
-        except Exception:
+        except Exception as exc:
             logger.warning(
-                "_bot_send_with_banner: could not send photo (%s), falling back to text.",
+                "_bot_send_with_banner: could not send photo (%s): %s — falling back to text.",
                 banner,
+                exc,
             )
     await bot.send_message(
         chat_id=chat_id,
