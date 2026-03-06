@@ -115,6 +115,34 @@ class TestLeadQualifier(unittest.TestCase):
         # Should return the original description on failure
         self.assertEqual(caption, description)
 
+    @patch("services.lead_qualifier._get_client")
+    def test_generate_auto_reply_returns_ai_text(self, mock_get_client):
+        mock_client = MagicMock()
+        choice = MagicMock()
+        choice.message.content = "Hi! Thanks for reaching out. An agent will contact you soon."
+        mock_client.chat.completions.create.return_value = MagicMock(choices=[choice])
+        mock_get_client.return_value = mock_client
+
+        from services.lead_qualifier import generate_auto_reply
+        reply = generate_auto_reply("I'm interested in buying a house.")
+
+        self.assertIsInstance(reply, str)
+        self.assertGreater(len(reply), 0)
+        self.assertIn("agent", reply.lower())
+
+    @patch("services.lead_qualifier._get_client")
+    def test_generate_auto_reply_fallback_on_error(self, mock_get_client):
+        mock_client = MagicMock()
+        mock_client.chat.completions.create.side_effect = Exception("API down")
+        mock_get_client.return_value = mock_client
+
+        from services.lead_qualifier import generate_auto_reply
+        reply = generate_auto_reply("hello")
+
+        # Should return the canned fallback message, not raise
+        self.assertIsInstance(reply, str)
+        self.assertGreater(len(reply), 0)
+
 
 if __name__ == "__main__":
     unittest.main()

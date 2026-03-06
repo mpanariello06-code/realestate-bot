@@ -396,5 +396,113 @@ class TestHandleMediaDirectUpload(unittest.IsolatedAsyncioTestCase):
         )
 
 
+# ── handle_auto_reply ─────────────────────────────────────────────────────────
+
+class TestHandleAutoReply(unittest.IsolatedAsyncioTestCase):
+    """
+    Verify that handle_auto_reply sends an AI-generated reply to any text
+    message that isn't handled by an existing flow.
+    """
+
+    def _make_text_update(self, chat_id: int, text: str = "Hello!") -> MagicMock:
+        update = MagicMock()
+        update.effective_chat.id = chat_id
+        update.effective_message.text = text
+        update.effective_message.reply_text = AsyncMock()
+        return update
+
+    @patch("bot.telegram_bot.lead_qualifier.generate_auto_reply",
+           return_value="Hi! An agent will contact you soon.")
+    async def test_auto_reply_responds_to_non_agent(self, mock_reply):
+        """Any user's text message must receive an AI reply."""
+        from bot.telegram_bot import handle_auto_reply
+        import bot.telegram_bot as tb
+
+        tb._bot_paused = False
+        update = self._make_text_update(chat_id=999999)
+        context = MagicMock()
+
+        with patch("bot.telegram_bot.config") as mock_cfg:
+            mock_cfg.TELEGRAM_AUTO_REPLY_ENABLED = True
+            mock_cfg.AGENT_CHAT_IDS = [123]
+            await handle_auto_reply(update, context)
+
+        update.effective_message.reply_text.assert_awaited_once_with(
+            "Hi! An agent will contact you soon."
+        )
+
+    @patch("bot.telegram_bot.lead_qualifier.generate_auto_reply",
+           return_value="Hi! An agent will contact you soon.")
+    async def test_auto_reply_responds_to_agent_outside_flow(self, mock_reply):
+        """Even an agent's unhandled text should get an auto-reply."""
+        from bot.telegram_bot import handle_auto_reply
+        import bot.telegram_bot as tb
+
+        tb._bot_paused = False
+        update = self._make_text_update(chat_id=123)
+        context = MagicMock()
+
+        with patch("bot.telegram_bot.config") as mock_cfg:
+            mock_cfg.TELEGRAM_AUTO_REPLY_ENABLED = True
+            mock_cfg.AGENT_CHAT_IDS = [123]
+            await handle_auto_reply(update, context)
+
+        update.effective_message.reply_text.assert_awaited_once()
+
+    @patch("bot.telegram_bot.lead_qualifier.generate_auto_reply",
+           return_value="Should not be sent")
+    async def test_auto_reply_skips_when_disabled(self, mock_reply):
+        """No reply sent when TELEGRAM_AUTO_REPLY_ENABLED is False."""
+        from bot.telegram_bot import handle_auto_reply
+
+        update = self._make_text_update(chat_id=999999)
+        context = MagicMock()
+
+        with patch("bot.telegram_bot.config") as mock_cfg:
+            mock_cfg.TELEGRAM_AUTO_REPLY_ENABLED = False
+            mock_cfg.AGENT_CHAT_IDS = [123]
+            await handle_auto_reply(update, context)
+
+        update.effective_message.reply_text.assert_not_called()
+
+    @patch("bot.telegram_bot.lead_qualifier.generate_auto_reply",
+           return_value="Should not be sent")
+    async def test_auto_reply_skips_when_bot_paused(self, mock_reply):
+        """No reply sent when the bot is paused."""
+        from bot.telegram_bot import handle_auto_reply
+        import bot.telegram_bot as tb
+
+        tb._bot_paused = True
+        update = self._make_text_update(chat_id=999999)
+        context = MagicMock()
+
+        with patch("bot.telegram_bot.config") as mock_cfg:
+            mock_cfg.TELEGRAM_AUTO_REPLY_ENABLED = True
+            mock_cfg.AGENT_CHAT_IDS = [123]
+            await handle_auto_reply(update, context)
+
+        update.effective_message.reply_text.assert_not_called()
+        tb._bot_paused = False  # reset global state
+
+    @patch("bot.telegram_bot.lead_qualifier.generate_auto_reply",
+           return_value="Should not be sent")
+    async def test_auto_reply_skips_empty_message(self, mock_reply):
+        """No reply sent when the message text is empty/None."""
+        from bot.telegram_bot import handle_auto_reply
+        import bot.telegram_bot as tb
+
+        tb._bot_paused = False
+        update = self._make_text_update(chat_id=999999)
+        update.effective_message.text = None
+        context = MagicMock()
+
+        with patch("bot.telegram_bot.config") as mock_cfg:
+            mock_cfg.TELEGRAM_AUTO_REPLY_ENABLED = True
+            mock_cfg.AGENT_CHAT_IDS = [123]
+            await handle_auto_reply(update, context)
+
+        update.effective_message.reply_text.assert_not_called()
+
+
 if __name__ == "__main__":
     unittest.main()

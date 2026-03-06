@@ -85,6 +85,49 @@ def qualify_lead(message: str) -> dict:
         }
 
 
+AUTO_REPLY_SYSTEM_PROMPT = """You are a friendly, professional real estate assistant chatbot.
+Your role is to help potential buyers, sellers, and renters with their property questions.
+Keep responses concise (2-4 sentences), warm, and helpful.
+If they ask about a specific property or want to schedule a viewing, let them know an agent
+will follow up with them shortly.
+Do not invent specific property details or prices.
+Encourage them to share their contact details if they would like a callback."""
+
+
+def generate_auto_reply(user_message: str) -> str:
+    """
+    Generate a helpful AI reply for an incoming user message.
+
+    Parameters
+    ----------
+    user_message : str
+        The raw text sent by the user.
+
+    Returns
+    -------
+    str
+        A short, friendly response from the real estate assistant.
+        Falls back to a canned message when the OpenAI call fails.
+    """
+    try:
+        response = _get_client().chat.completions.create(
+            model=config.OPENAI_MODEL,
+            messages=[
+                {"role": "system", "content": AUTO_REPLY_SYSTEM_PROMPT},
+                {"role": "user", "content": user_message},
+            ],
+            temperature=0.7,
+            max_tokens=200,
+        )
+        return response.choices[0].message.content.strip()
+    except Exception as exc:
+        logger.error("Auto-reply generation failed: %s", exc)
+        return (
+            "Thanks for your message! 👋 One of our agents will get back to you shortly. "
+            "Feel free to ask any questions about our properties in the meantime."
+        )
+
+
 LISTING_DESCRIPTION_PROMPT = """You are a real estate marketing copywriter.
 Given a property description from an agent, write an engaging social-media
 post caption (max 220 characters for Instagram, include relevant emojis).

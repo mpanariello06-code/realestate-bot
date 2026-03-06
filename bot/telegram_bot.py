@@ -12,6 +12,14 @@ Conversation flows
 
 The bot also handles incoming media messages and guides agents through the
 post-listing workflow via inline keyboards.
+
+Auto-reply
+──────────
+Any plain-text message that is not handled by one of the conversation flows
+above receives an AI-powered response from the real estate assistant.  This
+ensures the bot always replies, whether the sender is a lead/prospect or the
+agent themselves outside an active flow.  The feature can be disabled by
+setting TELEGRAM_AUTO_REPLY_ENABLED=false in .env.
 """
 from __future__ import annotations
 
@@ -1096,6 +1104,32 @@ async def _cmd_notes_info(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     )
 
 
+# ── Catch-all auto-reply ──────────────────────────────────────────────────────
+
+async def handle_auto_reply(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Reply to any text message that was not handled by another handler.
+
+    This ensures the bot is always responsive: leads and prospects who message
+    the bot receive an AI-generated real estate assistant reply even when they
+    are not inside a structured conversation flow.
+
+    The feature is gated by ``config.TELEGRAM_AUTO_REPLY_ENABLED`` so it can
+    be disabled in .env without code changes.
+    """
+    if not config.TELEGRAM_AUTO_REPLY_ENABLED:
+        return
+    if _bot_paused:
+        return
+    msg = update.effective_message
+    if not msg or not msg.text:
+        return
+    reply = lead_qualifier.generate_auto_reply(msg.text)
+    try:
+        await msg.reply_text(reply)
+    except Exception:
+        logger.exception("handle_auto_reply: failed to send reply")
+
+
 # ── Build Application ─────────────────────────────────────────────────────────
 
 # Commands registered with Telegram so they appear in the "/" menu.
@@ -1248,6 +1282,12 @@ def build_application() -> Application:
             handle_menu_callback,
             pattern="^(qualify_lead|performance|qualified_leads|all_leads|weekly_report|zapier_status|ghl_status|notes_info|help|stop_bot|start_bot)$",
         )
+    )
+
+    # Catch-all: auto-reply to any text not handled above.
+    # Must be registered last so ConversationHandlers and commands take priority.
+    app.add_handler(
+        MessageHandler(filters.TEXT & ~filters.COMMAND, handle_auto_reply)
     )
 
     return app

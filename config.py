@@ -116,3 +116,9 @@ GHL_SOCIAL_ACCOUNT_IDS: str = os.getenv("GHL_SOCIAL_ACCOUNT_IDS", "")
 GHL_CLIENT_ID: str = os.getenv("GHL_CLIENT_ID", "")
 GHL_CLIENT_SECRET: str = os.getenv("GHL_CLIENT_SECRET", "")
 GHL_REFRESH_TOKEN: str = os.getenv("GHL_REFRESH_TOKEN", "")
+
+# ── Telegram Auto-Reply ───────────────────────────────────────────────────────
+# When True (the default), the bot auto-replies to every incoming text message
+# that is not already handled by a conversation flow.  Set to "false" in .env
+# to disable the catch-all AI response and let unhandled messages pass silently.
+TELEGRAM_AUTO_REPLY_ENABLED: bool = os.getenv("TELEGRAM_AUTO_REPLY_ENABLED", "true").lower() == "true"
