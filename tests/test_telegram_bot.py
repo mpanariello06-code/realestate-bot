@@ -293,5 +293,108 @@ class TestCmdNotes(unittest.IsolatedAsyncioTestCase):
         self.assertIn("Usage", reply_text)
 
 
+# ── handle_media: direct photo upload (no /post required) ─────────────────────
+
+class TestHandleMediaDirectUpload(unittest.IsolatedAsyncioTestCase):
+    """
+    Verify that an authorised agent can send a photo/video directly (without
+    first running /post) and receive the "✅ Media received!" confirmation.
+    """
+
+    def _make_photo_update(self, chat_id: int = 123):
+        """Build a fake Update that looks like an incoming photo message."""
+        photo_size = MagicMock()
+        photo_size.get_file = AsyncMock(
+            return_value=MagicMock(
+                download_to_drive=AsyncMock()
+            )
+        )
+        update = MagicMock()
+        update.effective_chat.id = chat_id
+        update.effective_message.photo = [photo_size]
+        update.effective_message.video = None
+        update.effective_message.reply_text = AsyncMock()
+        return update
+
+    async def test_photo_sent_directly_replies_media_received(self):
+        """Agent sends photo outside /post flow – bot must confirm receipt."""
+        from bot.telegram_bot import handle_media, AWAITING_DESCRIPTION
+        import tempfile, os
+
+        update = self._make_photo_update(chat_id=123)
+        context = MagicMock()
+        context.user_data = {}
+
+        with patch("bot.telegram_bot.tempfile.NamedTemporaryFile",
+                   return_value=MagicMock(name="/tmp/fake.jpg", __enter__=MagicMock(), __exit__=MagicMock())):
+            result = await handle_media(update, context)
+
+        reply_text = update.effective_message.reply_text.call_args[0][0]
+        self.assertIn("Media received", reply_text)
+        self.assertEqual(result, AWAITING_DESCRIPTION)
+
+    async def test_photo_from_unauthorized_user_is_rejected(self):
+        """Non-agent sending a photo must get the unauthorised message."""
+        from bot.telegram_bot import handle_media
+        from telegram.ext import ConversationHandler
+
+        update = self._make_photo_update(chat_id=999999)
+        context = MagicMock()
+        context.user_data = {}
+
+        result = await handle_media(update, context)
+
+        # Should return END (not enter the conversation)
+        self.assertEqual(result, ConversationHandler.END)
+        # Should have told the user they are not authorised
+        reply_text = update.effective_message.reply_text.call_args[0][0]
+        self.assertIn("not authorised", reply_text)
+
+    async def test_media_type_stored_as_photo_in_user_data(self):
+        """After receiving a photo, CTX_MEDIA_TYPE must be set to 'photo'."""
+        from bot.telegram_bot import handle_media, CTX_MEDIA_TYPE
+
+        update = self._make_photo_update(chat_id=123)
+        context = MagicMock()
+        context.user_data = {}
+
+        with patch("bot.telegram_bot.tempfile.NamedTemporaryFile",
+                   return_value=MagicMock(name="/tmp/fake.jpg", __enter__=MagicMock(), __exit__=MagicMock())):
+            await handle_media(update, context)
+
+        self.assertEqual(context.user_data.get(CTX_MEDIA_TYPE), "photo")
+
+    async def test_post_conv_entry_points_include_photo_handler(self):
+        """The ConversationHandler entry_points must contain a photo/video handler."""
+        from bot.telegram_bot import build_application
+        from telegram.ext import MessageHandler, ConversationHandler
+
+        with patch("bot.telegram_bot.Application.builder") as mock_builder:
+            mock_app = MagicMock()
+            mock_builder.return_value.token.return_value.post_init.return_value.build.return_value = mock_app
+            mock_app.add_handler = MagicMock()
+
+            build_application()
+
+        # Find the ConversationHandler that was added
+        added_handlers = [
+            call.args[0] for call in mock_app.add_handler.call_args_list
+        ]
+        conv_handlers = [h for h in added_handlers if isinstance(h, ConversationHandler)]
+        self.assertTrue(conv_handlers, "No ConversationHandler was registered")
+
+        # Check that the first ConversationHandler (post_conv) has a MessageHandler
+        # entry point that handles photos/videos
+        post_conv = conv_handlers[0]
+        entry_msg_handlers = [
+            ep for ep in post_conv.entry_points
+            if isinstance(ep, MessageHandler)
+        ]
+        self.assertTrue(
+            entry_msg_handlers,
+            "post_conv must have a MessageHandler entry point for direct photo uploads"
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

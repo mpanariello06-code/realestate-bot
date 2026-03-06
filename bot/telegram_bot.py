@@ -603,7 +603,14 @@ async def cmd_post(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 
 
 async def handle_media(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Receive photo/video and save locally, then ask for description."""
+    """Receive photo/video and save locally, then ask for description.
+
+    This is registered both as a ConversationHandler state handler (AWAITING_MEDIA)
+    and as an entry point so that photos/videos sent directly – without first
+    running /post – are handled automatically.
+    """
+    if not await _agent_only(update, context):
+        return ConversationHandler.END
     msg: Message = update.effective_message
     if msg.photo:
         file = await msg.photo[-1].get_file()
@@ -1150,6 +1157,9 @@ def build_application() -> Application:
             CallbackQueryHandler(
                 lambda u, c: cmd_post(u, c), pattern="^post_listing$"
             ),
+            # Allow agents to start the listing flow by sending a photo/video
+            # directly – without needing to run /post first.
+            MessageHandler(filters.PHOTO | filters.VIDEO, handle_media),
         ],
         states={
             AWAITING_MEDIA: [
