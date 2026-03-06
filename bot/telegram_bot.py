@@ -141,6 +141,91 @@ async def _agent_only(update: Update, context: ContextTypes.DEFAULT_TYPE) -> boo
     return True
 
 
+# ── Banner helper ─────────────────────────────────────────────────────────────
+
+async def _send_with_banner(
+    message: Message,
+    text: str,
+    parse_mode: str | None = ParseMode.MARKDOWN,
+    reply_markup=None,
+) -> None:
+    """Send *text* as the caption of the configured banner image.
+
+    Falls back to a plain ``reply_text`` call when:
+    * ``BOT_BANNER_IMAGE`` is not configured (empty string), or
+    * the photo send fails for any reason (e.g. file not found, network error).
+
+    Args:
+        message: The :class:`~telegram.Message` to reply to.
+        text: Message body / caption.
+        parse_mode: Telegram parse mode (default: Markdown).
+        reply_markup: Optional inline keyboard attached to the message.
+    """
+    banner = config.BOT_BANNER_IMAGE.strip()
+    if banner:
+        try:
+            # Accept both a local file path and an HTTPS URL.
+            if banner.startswith("http"):
+                photo: bytes | str = banner
+            else:
+                with open(banner, "rb") as fh:
+                    photo = fh.read()
+            await message.reply_photo(
+                photo=photo,
+                caption=text,
+                parse_mode=parse_mode,
+                reply_markup=reply_markup,
+            )
+            return
+        except Exception:
+            logger.warning(
+                "_send_with_banner: could not send photo (%s), falling back to text.",
+                banner,
+            )
+    await message.reply_text(text, parse_mode=parse_mode, reply_markup=reply_markup)
+
+
+async def _bot_send_with_banner(
+    bot,
+    chat_id: int,
+    text: str,
+    parse_mode: str | None = ParseMode.MARKDOWN,
+    reply_markup=None,
+) -> None:
+    """Like :func:`_send_with_banner` but uses ``bot.send_photo`` / ``bot.send_message``.
+
+    Used in contexts where we have a :class:`~telegram.Bot` instance rather
+    than a :class:`~telegram.Message` to reply to (e.g. the startup handler).
+    """
+    banner = config.BOT_BANNER_IMAGE.strip()
+    if banner:
+        try:
+            if banner.startswith("http"):
+                photo: bytes | str = banner
+            else:
+                with open(banner, "rb") as fh:
+                    photo = fh.read()
+            await bot.send_photo(
+                chat_id=chat_id,
+                photo=photo,
+                caption=text,
+                parse_mode=parse_mode,
+                reply_markup=reply_markup,
+            )
+            return
+        except Exception:
+            logger.warning(
+                "_bot_send_with_banner: could not send photo (%s), falling back to text.",
+                banner,
+            )
+    await bot.send_message(
+        chat_id=chat_id,
+        text=text,
+        parse_mode=parse_mode,
+        reply_markup=reply_markup,
+    )
+
+
 # ── /start ────────────────────────────────────────────────────────────────────
 
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -155,7 +240,8 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             )
         return
     _bot_paused = False
-    await update.effective_message.reply_text(
+    await _send_with_banner(
+        update.effective_message,
         "🏠 *Real Estate Agent Assistant*\n\n"
         "Welcome! Here's what I can do for you:\n\n"
         "📸 *Post Listing* — Publish a property to social media\n"
@@ -166,7 +252,6 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         "📈 *Weekly Report* — Get a detailed performance summary\n"
         "⚙️ *Integrations* — Check your connection status\n\n"
         "Tap a button below to get started 👇",
-        parse_mode=ParseMode.MARKDOWN,
         reply_markup=main_menu_keyboard(),
     )
 
@@ -1142,7 +1227,7 @@ async def handle_auto_reply(update: Update, context: ContextTypes.DEFAULT_TYPE) 
             "Please type your question and I'll reply straight away!"
         )
     try:
-        await msg.reply_text(reply)
+        await _send_with_banner(msg, reply, parse_mode=None)
     except Exception:
         logger.exception("handle_auto_reply: failed to send reply")
 
@@ -1180,13 +1265,13 @@ async def _on_startup(app: Application) -> None:
         return
     for chat_id in config.AGENT_CHAT_IDS:
         try:
-            await app.bot.send_message(
+            await _bot_send_with_banner(
+                app.bot,
                 chat_id=chat_id,
                 text=(
                     "🟢 *Real Estate Agent Assistant is Online!*\n\n"
                     "Your bot is up and ready to go. Tap a button below to get started 👇"
                 ),
-                parse_mode=ParseMode.MARKDOWN,
                 reply_markup=main_menu_keyboard(),
             )
         except Exception as exc:

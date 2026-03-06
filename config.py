@@ -122,3 +122,10 @@ GHL_REFRESH_TOKEN: str = os.getenv("GHL_REFRESH_TOKEN", "")
 # that is not already handled by a conversation flow.  Set to "false" in .env
 # to disable the catch-all AI response and let unhandled messages pass silently.
 TELEGRAM_AUTO_REPLY_ENABLED: bool = os.getenv("TELEGRAM_AUTO_REPLY_ENABLED", "true").lower() == "true"
+
+# ── Bot Banner Image ──────────────────────────────────────────────────────────
+# Path to a local image file (or a public HTTPS URL) that is attached to key
+# bot messages such as the welcome screen and auto-replies.  A bundled default
+# banner is provided in the assets/ folder.  Set to an empty string to send
+# plain-text messages with no image attached.
+BOT_BANNER_IMAGE: str = os.getenv("BOT_BANNER_IMAGE", "assets/banner.jpg")

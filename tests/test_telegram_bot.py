@@ -425,11 +425,12 @@ class TestHandleAutoReply(unittest.IsolatedAsyncioTestCase):
         with patch("bot.telegram_bot.config") as mock_cfg:
             mock_cfg.TELEGRAM_AUTO_REPLY_ENABLED = True
             mock_cfg.AGENT_CHAT_IDS = [123]
+            mock_cfg.BOT_BANNER_IMAGE = ""  # disable banner for this test
             await handle_auto_reply(update, context)
 
-        update.effective_message.reply_text.assert_awaited_once_with(
-            "Hi! An agent will contact you soon."
-        )
+        update.effective_message.reply_text.assert_awaited_once()
+        sent_text = update.effective_message.reply_text.call_args[0][0]
+        self.assertEqual(sent_text, "Hi! An agent will contact you soon.")
 
     @patch("bot.telegram_bot.lead_qualifier.generate_auto_reply",
            return_value="Hi! An agent will contact you soon.")
@@ -445,6 +446,7 @@ class TestHandleAutoReply(unittest.IsolatedAsyncioTestCase):
         with patch("bot.telegram_bot.config") as mock_cfg:
             mock_cfg.TELEGRAM_AUTO_REPLY_ENABLED = True
             mock_cfg.AGENT_CHAT_IDS = [123]
+            mock_cfg.BOT_BANNER_IMAGE = ""
             await handle_auto_reply(update, context)
 
         update.effective_message.reply_text.assert_awaited_once()
@@ -520,6 +522,7 @@ class TestHandleAutoReply(unittest.IsolatedAsyncioTestCase):
         with patch("bot.telegram_bot.config") as mock_cfg:
             mock_cfg.TELEGRAM_AUTO_REPLY_ENABLED = True
             mock_cfg.AGENT_CHAT_IDS = [123]
+            mock_cfg.BOT_BANNER_IMAGE = ""  # disable banner for this test
             await handle_auto_reply(update, context)
 
         # Should reply with the "please type" canned message
@@ -543,11 +546,145 @@ class TestHandleAutoReply(unittest.IsolatedAsyncioTestCase):
         with patch("bot.telegram_bot.config") as mock_cfg:
             mock_cfg.TELEGRAM_AUTO_REPLY_ENABLED = True
             mock_cfg.AGENT_CHAT_IDS = [123]
+            mock_cfg.BOT_BANNER_IMAGE = ""  # disable banner for this test
             await handle_auto_reply(update, context)
 
         update.effective_message.reply_text.assert_awaited_once()
         sent_text = update.effective_message.reply_text.call_args[0][0]
         self.assertIn("text", sent_text.lower())
+
+
+class TestSendWithBanner(unittest.IsolatedAsyncioTestCase):
+    """Tests for the _send_with_banner / _bot_send_with_banner helpers."""
+
+    async def test_uses_reply_photo_when_banner_is_local_file(self):
+        """When BOT_BANNER_IMAGE points to an existing file, reply_photo is used."""
+        import os
+        import tempfile
+        from bot.telegram_bot import _send_with_banner
+
+        # Create a tiny real file so open() succeeds
+        with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as f:
+            f.write(b"\xff\xd8\xff\xe0" + b"\x00" * 100)  # minimal JPEG header
+            tmp_path = f.name
+
+        msg = MagicMock()
+        msg.reply_photo = AsyncMock()
+        msg.reply_text = AsyncMock()
+
+        try:
+            with patch("bot.telegram_bot.config") as mock_cfg:
+                mock_cfg.BOT_BANNER_IMAGE = tmp_path
+                await _send_with_banner(msg, "Hello!", parse_mode="Markdown")
+
+            msg.reply_photo.assert_awaited_once()
+            msg.reply_text.assert_not_called()
+            # Caption should contain the message text
+            call_kwargs = msg.reply_photo.call_args[1]
+            self.assertEqual(call_kwargs["caption"], "Hello!")
+        finally:
+            os.unlink(tmp_path)
+
+    async def test_falls_back_to_text_when_banner_is_empty(self):
+        """When BOT_BANNER_IMAGE is empty, reply_text is used directly."""
+        from bot.telegram_bot import _send_with_banner
+
+        msg = MagicMock()
+        msg.reply_photo = AsyncMock()
+        msg.reply_text = AsyncMock()
+
+        with patch("bot.telegram_bot.config") as mock_cfg:
+            mock_cfg.BOT_BANNER_IMAGE = ""
+            await _send_with_banner(msg, "Hello plain!", parse_mode=None)
+
+        msg.reply_text.assert_awaited_once()
+        msg.reply_photo.assert_not_called()
+        sent_text = msg.reply_text.call_args[0][0]
+        self.assertEqual(sent_text, "Hello plain!")
+
+    async def test_falls_back_to_text_on_photo_error(self):
+        """When reply_photo raises, the message is delivered as plain text."""
+        import os
+        import tempfile
+        from bot.telegram_bot import _send_with_banner
+
+        with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as f:
+            f.write(b"\xff\xd8")
+            tmp_path = f.name
+
+        msg = MagicMock()
+        msg.reply_photo = AsyncMock(side_effect=RuntimeError("upload failed"))
+        msg.reply_text = AsyncMock()
+
+        try:
+            with patch("bot.telegram_bot.config") as mock_cfg:
+                mock_cfg.BOT_BANNER_IMAGE = tmp_path
+                await _send_with_banner(msg, "Fallback text", parse_mode=None)
+
+            msg.reply_text.assert_awaited_once()
+            sent_text = msg.reply_text.call_args[0][0]
+            self.assertEqual(sent_text, "Fallback text")
+        finally:
+            os.unlink(tmp_path)
+
+    async def test_bot_send_uses_send_photo_when_banner_configured(self):
+        """_bot_send_with_banner calls bot.send_photo when banner is set."""
+        import os
+        import tempfile
+        from bot.telegram_bot import _bot_send_with_banner
+
+        with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as f:
+            f.write(b"\xff\xd8\xff\xe0" + b"\x00" * 100)
+            tmp_path = f.name
+
+        bot = MagicMock()
+        bot.send_photo = AsyncMock()
+        bot.send_message = AsyncMock()
+
+        try:
+            with patch("bot.telegram_bot.config") as mock_cfg:
+                mock_cfg.BOT_BANNER_IMAGE = tmp_path
+                await _bot_send_with_banner(bot, chat_id=123, text="Online!")
+
+            bot.send_photo.assert_awaited_once()
+            bot.send_message.assert_not_called()
+        finally:
+            os.unlink(tmp_path)
+
+    async def test_auto_reply_uses_banner_when_configured(self):
+        """handle_auto_reply sends reply_photo when BOT_BANNER_IMAGE is set."""
+        import os
+        import tempfile
+        import bot.telegram_bot as tb
+        from bot.telegram_bot import handle_auto_reply
+
+        with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as f:
+            f.write(b"\xff\xd8\xff\xe0" + b"\x00" * 100)
+            tmp_path = f.name
+
+        tb._bot_paused = False
+        update = MagicMock()
+        update.effective_message.text = "What properties do you have?"
+        update.effective_message.reply_photo = AsyncMock()
+        update.effective_message.reply_text = AsyncMock()
+        context = MagicMock()
+
+        try:
+            with patch("bot.telegram_bot.config") as mock_cfg, \
+                 patch("bot.telegram_bot.lead_qualifier.generate_auto_reply",
+                        return_value="We have many great properties!"):
+                mock_cfg.TELEGRAM_AUTO_REPLY_ENABLED = True
+                mock_cfg.AGENT_CHAT_IDS = [123]
+                mock_cfg.BOT_BANNER_IMAGE = tmp_path
+                await handle_auto_reply(update, context)
+
+            # Should use reply_photo (banner path), not plain reply_text
+            update.effective_message.reply_photo.assert_awaited_once()
+            update.effective_message.reply_text.assert_not_called()
+            call_kwargs = update.effective_message.reply_photo.call_args[1]
+            self.assertEqual(call_kwargs["caption"], "We have many great properties!")
+        finally:
+            os.unlink(tmp_path)
 
 
 if __name__ == "__main__":
