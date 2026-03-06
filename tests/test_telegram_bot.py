@@ -486,14 +486,35 @@ class TestHandleAutoReply(unittest.IsolatedAsyncioTestCase):
 
     @patch("bot.telegram_bot.lead_qualifier.generate_auto_reply",
            return_value="Should not be sent")
-    async def test_auto_reply_skips_empty_message(self, mock_reply):
-        """No reply sent when the message text is empty/None."""
+    async def test_auto_reply_skips_when_no_message(self, mock_reply):
+        """No reply sent when effective_message is None."""
         from bot.telegram_bot import handle_auto_reply
         import bot.telegram_bot as tb
 
         tb._bot_paused = False
-        update = self._make_text_update(chat_id=999999)
+        update = MagicMock()
+        update.effective_message = None
+        context = MagicMock()
+
+        with patch("bot.telegram_bot.config") as mock_cfg:
+            mock_cfg.TELEGRAM_AUTO_REPLY_ENABLED = True
+            mock_cfg.AGENT_CHAT_IDS = [123]
+            await handle_auto_reply(update, context)  # must not raise
+
+    async def test_auto_reply_non_text_sends_prompt(self):
+        """A sticker / voice / non-text message gets the 'please type' canned reply."""
+        from bot.telegram_bot import handle_auto_reply
+        import bot.telegram_bot as tb
+
+        tb._bot_paused = False
+        update = MagicMock()
+        # Simulate a sticker message: text is None but sticker is present
         update.effective_message.text = None
+        update.effective_message.sticker = MagicMock()  # real sticker payload
+        update.effective_message.voice = None
+        update.effective_message.audio = None
+        update.effective_message.document = None
+        update.effective_message.reply_text = AsyncMock()
         context = MagicMock()
 
         with patch("bot.telegram_bot.config") as mock_cfg:
@@ -501,7 +522,32 @@ class TestHandleAutoReply(unittest.IsolatedAsyncioTestCase):
             mock_cfg.AGENT_CHAT_IDS = [123]
             await handle_auto_reply(update, context)
 
-        update.effective_message.reply_text.assert_not_called()
+        # Should reply with the "please type" canned message
+        update.effective_message.reply_text.assert_awaited_once()
+        sent_text = update.effective_message.reply_text.call_args[0][0]
+        self.assertIn("text", sent_text.lower())
+
+    async def test_auto_reply_voice_message_sends_prompt(self):
+        """A voice message also gets the 'please type' canned reply."""
+        from bot.telegram_bot import handle_auto_reply
+        import bot.telegram_bot as tb
+
+        tb._bot_paused = False
+        update = MagicMock()
+        update.effective_message.text = None
+        update.effective_message.voice = MagicMock()  # real voice payload
+        update.effective_message.sticker = None
+        update.effective_message.reply_text = AsyncMock()
+        context = MagicMock()
+
+        with patch("bot.telegram_bot.config") as mock_cfg:
+            mock_cfg.TELEGRAM_AUTO_REPLY_ENABLED = True
+            mock_cfg.AGENT_CHAT_IDS = [123]
+            await handle_auto_reply(update, context)
+
+        update.effective_message.reply_text.assert_awaited_once()
+        sent_text = update.effective_message.reply_text.call_args[0][0]
+        self.assertIn("text", sent_text.lower())
 
 
 if __name__ == "__main__":

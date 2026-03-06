@@ -15,11 +15,18 @@ post-listing workflow via inline keyboards.
 
 Auto-reply
 ──────────
-Any plain-text message that is not handled by one of the conversation flows
-above receives an AI-powered response from the real estate assistant.  This
-ensures the bot always replies, whether the sender is a lead/prospect or the
-agent themselves outside an active flow.  The feature can be disabled by
-setting TELEGRAM_AUTO_REPLY_ENABLED=false in .env.
+Any message not claimed by one of the conversation flows above or by a
+registered command receives an auto-reply so the bot is always responsive:
+
+* *Text messages* → AI-generated real estate assistant reply (powered by
+  OpenAI).  This applies to leads, prospects, and agents alike whenever they
+  type something outside an active flow.
+* *Non-text messages* (stickers, voice messages, documents, photos from
+  non-agents, etc.) → a friendly prompt asking the sender to type their
+  question in plain text.
+
+The feature can be disabled by setting ``TELEGRAM_AUTO_REPLY_ENABLED=false``
+in .env.
 """
 from __future__ import annotations
 
@@ -1107,11 +1114,15 @@ async def _cmd_notes_info(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 # ── Catch-all auto-reply ──────────────────────────────────────────────────────
 
 async def handle_auto_reply(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Reply to any text message that was not handled by another handler.
+    """Reply to any message that was not handled by another handler.
 
-    This ensures the bot is always responsive: leads and prospects who message
-    the bot receive an AI-generated real estate assistant reply even when they
-    are not inside a structured conversation flow.
+    This ensures the bot is always responsive: leads, prospects, and agents
+    all receive a reply regardless of the message type (text, sticker, voice,
+    document, etc.) or whether they are inside a structured conversation flow.
+
+    - *Text messages* → AI-generated real estate assistant reply.
+    - *Non-text messages* → a friendly prompt asking the user to type their
+      question instead (the bot can only read plain text).
 
     The feature is gated by ``config.TELEGRAM_AUTO_REPLY_ENABLED`` so it can
     be disabled in .env without code changes.
@@ -1121,9 +1132,15 @@ async def handle_auto_reply(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     if _bot_paused:
         return
     msg = update.effective_message
-    if not msg or not msg.text:
+    if not msg:
         return
-    reply = lead_qualifier.generate_auto_reply(msg.text)
+    if msg.text:
+        reply = lead_qualifier.generate_auto_reply(msg.text)
+    else:
+        reply = (
+            "I can only read text messages. 💬\n"
+            "Please type your question and I'll reply straight away!"
+        )
     try:
         await msg.reply_text(reply)
     except Exception:
@@ -1284,10 +1301,12 @@ def build_application() -> Application:
         )
     )
 
-    # Catch-all: auto-reply to any text not handled above.
+    # Catch-all: auto-reply to any message not handled above.
+    # Uses ~filters.COMMAND so it fires for text, stickers, voice, documents,
+    # etc. — everything except slash commands (which have their own handlers).
     # Must be registered last so ConversationHandlers and commands take priority.
     app.add_handler(
-        MessageHandler(filters.TEXT & ~filters.COMMAND, handle_auto_reply)
+        MessageHandler(~filters.COMMAND, handle_auto_reply)
     )
 
     return app
