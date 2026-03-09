@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block content %}
+<div style="display:flex;align-items:center;gap:1rem;margin-bottom:1.5rem">
+  <h1 style="margin:0">🎯 {{ "Qualified Leads" if qualified_only else "All Leads" }}</h1>
+  {% if qualified_only %}
+  <a href="/leads" class="btn btn-primary btn-sm">Show All</a>
+  {% else %}
+  <a href="/leads?qualified=true" class="btn btn-primary btn-sm">Qualified Only</a>
+  {% endif %}
+</div>
+
+<div class="card" style="padding:0;overflow:hidden">
+  {% if leads %}
+  <table>
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Name</th>
+        <th>Contact</th>
+        <th>Platform</th>
+        <th>Intent</th>
+        <th>Score</th>
+        <th>Budget</th>
+        <th>Timeline</th>
+        <th>Summary</th>
+        <th>Status</th>
+        <th>Date</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for lead in leads %}
+      {% set status = lead.status | default('new') %}
+      <tr>
+        <td>{{ loop.index }}</td>
+        <td>
+          <strong>{{ lead.first_name }} {{ lead.last_name }}</strong>
+        </td>
+        <td style="font-size:.8rem">
+          {% if lead.email %}<div>📧 {{ lead.email }}</div>{% endif %}
+          {% if lead.phone %}<div>📞 {{ lead.phone }}</div>{% endif %}
+        </td>
+        <td>{{ lead.platform | title }}</td>
+        <td>{{ lead.intent | title }}</td>
+        <td>
+          {% set score = lead.score | int %}
+          {% if score >= 70 %}
+          <span class="badge badge-green">{{ score }}</span>
+          {% elif score >= 40 %}
+          <span class="badge badge-yellow">{{ score }}</span>
+          {% else %}
+          <span class="badge badge-red">{{ score }}</span>
+          {% endif %}
+        </td>
+        <td style="font-size:.82rem">{{ lead.budget or '—' }}</td>
+        <td style="font-size:.82rem">{{ lead.timeline or '—' }}</td>
+        <td style="font-size:.82rem;max-width:220px">{{ lead.summary }}</td>
+        <td>
+          {% if status == 'closed' %}
+          <span class="badge badge-green">Closed</span>
+          {% elif status == 'contacted' %}
+          <span class="badge badge-yellow">Contacted</span>
+          {% elif status == 'lost' %}
+          <span class="badge badge-red">Lost</span>
+          {% else %}
+          <span class="badge badge-gray">New</span>
+          {% endif %}
+        </td>
+        <td style="font-size:.8rem;white-space:nowrap">{{ lead.timestamp }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div style="padding:2rem;color:var(--muted);text-align:center">
+    No leads found yet. They'll appear here once your bot starts receiving enquiries.
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

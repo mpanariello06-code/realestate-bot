@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>📊 Dashboard</h1>
+
+{% if stats %}
+<div class="stats-grid">
+  <div class="stat-card">
+    <div class="value">{{ stats.total_leads }}</div>
+    <div class="label">Total Leads</div>
+  </div>
+  <div class="stat-card">
+    <div class="value">{{ stats.qualified_leads }}</div>
+    <div class="label">Qualified Leads</div>
+  </div>
+  <div class="stat-card">
+    <div class="value">{{ stats.deals_closed }}</div>
+    <div class="label">Deals Closed</div>
+  </div>
+  <div class="stat-card">
+    <div class="value">{{ stats.conversion_rate }}%</div>
+    <div class="label">Conversion Rate</div>
+  </div>
+</div>
+{% else %}
+<div class="card">
+  <p style="color:var(--muted)">No data yet. Connect your Google Sheets and start using the Telegram bot.</p>
+</div>
+{% endif %}
+
+<div class="card">
+  <h2 style="margin-bottom:1rem;font-size:1.1rem">📈 Weekly Performance</h2>
+  {% if performance %}
+  <table>
+    <thead>
+      <tr>
+        <th>Week Start</th>
+        <th>Platform</th>
+        <th>Followers</th>
+        <th>New Leads</th>
+        <th>Qualified</th>
+        <th>Deals Closed</th>
+        <th>Avg Response</th>
+        <th>Engagement</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in performance %}
+      <tr>
+        <td>{{ row.week_start }}</td>
+        <td>{{ row.platform | title }}</td>
+        <td>{{ "{:,}".format(row.followers | int) }}</td>
+        <td>{{ row.new_leads }}</td>
+        <td>{{ row.qualified_leads }}</td>
+        <td>{{ row.deals_closed }}</td>
+        <td>{{ row.avg_response_time }} min</td>
+        <td>{{ row.engagement_rate }}%</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p style="color:var(--muted)">No performance records yet.</p>
+  {% endif %}
+</div>
+
+<div class="card">
+  <h2 style="margin-bottom:.75rem;font-size:1.1rem">🚀 Quick Actions</h2>
+  <a href="/leads?qualified=true" class="btn btn-primary">View Qualified Leads</a>
+  &nbsp;
+  <a href="/leads" class="btn btn-primary">All Leads</a>
+  &nbsp;
+  <a href="/connect-socials" class="btn btn-primary">Connect Socials</a>
+</div>
+{% endblock %}
