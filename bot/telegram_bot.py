@@ -1019,6 +1019,15 @@ async def handle_platform_callback(update: Update, context: ContextTypes.DEFAULT
             result_text = f"✅ Instagram: {post_id}"
         else:
             result_text = f"❌ Instagram: {res.get('error', '')}"
+    elif platform == "linkedin":
+        res = social_poster.post_to_linkedin(
+            caption, image_path if media_type == "photo" else None
+        )
+        if res.get("success"):
+            post_id = res.get("post_id", "")
+            result_text = f"✅ LinkedIn: {post_id}"
+        else:
+            result_text = f"❌ LinkedIn: {res.get('error', '')}"
     else:
         result_text = "❌ Unknown platform or missing media."
 

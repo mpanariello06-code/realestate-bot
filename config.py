@@ -46,6 +46,14 @@ INSTAGRAM_ACCOUNT_ID: str = os.getenv("INSTAGRAM_ACCOUNT_ID", "")
 TIKTOK_ACCESS_TOKEN: str = os.getenv("TIKTOK_ACCESS_TOKEN", "")
 TIKTOK_OPEN_ID: str = os.getenv("TIKTOK_OPEN_ID", "")
 
+# ── LinkedIn ──────────────────────────────────────────────────────────────────
+# OAuth 2.0 access token for the LinkedIn API.
+# LINKEDIN_AUTHOR_URN is the full URN of the posting identity, e.g.:
+#   urn:li:person:AbCdEfGhIj   (personal profile)
+#   urn:li:organization:123456 (company page)
+LINKEDIN_ACCESS_TOKEN: str = os.getenv("LINKEDIN_ACCESS_TOKEN", "")
+LINKEDIN_AUTHOR_URN: str = os.getenv("LINKEDIN_AUTHOR_URN", "")
+
 # ── Flask Portal ──────────────────────────────────────────────────────────────
 FLASK_SECRET_KEY: str = os.getenv("FLASK_SECRET_KEY", "dev-secret-change-me")
 FLASK_PORT: int = int(os.getenv("FLASK_PORT", "5000"))
