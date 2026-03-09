@@ -41,6 +41,7 @@ from telegram import (
     Chat,
     ChatAdministratorRights,
     ChatMember,
+    ForceReply,
     InlineKeyboardButton,
     InlineKeyboardMarkup,
     Message,
@@ -139,7 +140,8 @@ async def _agent_only(update: Update, context: ContextTypes.DEFAULT_TYPE) -> boo
                 "⛔ You are not authorised to use this bot.\n\n"
                 "To get access, send /myid to this bot to find your Telegram "
                 "chat ID, then add it to the AGENT_CHAT_IDS line in your .env "
-                "file and restart the bot."
+                "file and restart the bot.",
+                reply_markup=ForceReply(selective=True),
             )
         return False
     return True
@@ -159,12 +161,25 @@ async def _send_with_banner(
     * ``BOT_BANNER_IMAGE`` is not configured (empty string), or
     * the photo send fails for any reason (e.g. file not found, network error).
 
+    When no *reply_markup* is provided the message is sent with
+    ``ForceReply(selective=True)`` so that Telegram automatically pre-fills
+    the reply UI for the user's next message.  This ensures the bot receives
+    every response in both private chats and group chats (the reply bypasses
+    Telegram's Group Privacy Mode).
+
     Args:
         message: The :class:`~telegram.Message` to reply to.
         text: Message body / caption.
         parse_mode: Telegram parse mode (default: Markdown).
-        reply_markup: Optional inline keyboard attached to the message.
+        reply_markup: Optional inline keyboard attached to the message.  When
+            *None* the message is sent with :class:`~telegram.ForceReply`.
     """
+    # Default to ForceReply when the caller did not supply an inline keyboard.
+    # This keeps the Telegram input box in "reply" mode after every bot
+    # message, so the user's next message arrives as a reply and the bot
+    # receives it even in groups where Privacy Mode is enabled.
+    if reply_markup is None:
+        reply_markup = ForceReply(selective=True)
     banner = config.BOT_BANNER_IMAGE.strip()
     if banner:
         try:
@@ -253,6 +268,7 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                 "I'm an Administrator in this group and can see every message. "
                 "I'll reply automatically to anyone who writes a question here. 🏠",
                 parse_mode=ParseMode.MARKDOWN,
+                reply_markup=ForceReply(selective=True),
             )
         else:
             await update.effective_message.reply_text(
@@ -267,6 +283,7 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                 "_Until then I can only respond to /commands and messages "
                 "that are direct replies to my messages._",
                 parse_mode=ParseMode.MARKDOWN,
+                reply_markup=ForceReply(selective=True),
             )
         return
 
@@ -277,7 +294,8 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                 "⛔ You are not authorised to use this bot.\n\n"
                 "To get access, send /myid to this bot to find your Telegram "
                 "chat ID, then add it to the AGENT_CHAT_IDS line in your .env "
-                "file and restart the bot."
+                "file and restart the bot.",
+                reply_markup=ForceReply(selective=True),
             )
         return
     _bot_paused = False
@@ -341,6 +359,7 @@ async def cmd_myid(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         "To add multiple agents, separate each ID with a comma:\n"
         "   `AGENT_CHAT_IDS=111111111,222222222`",
         parse_mode=ParseMode.MARKDOWN,
+        reply_markup=ForceReply(selective=True),
     )
 
 
@@ -390,6 +409,7 @@ async def cmd_qualify(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
         "Paste the enquiry message from the prospect (WhatsApp, DM, email, etc.) "
         "and I'll score it instantly.",
         parse_mode=ParseMode.MARKDOWN,
+        reply_markup=ForceReply(selective=True),
     )
     return AWAITING_QUALIFY_MESSAGE
 
@@ -739,6 +759,7 @@ async def cmd_post(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         "or send a text description if you have no media.\n\n"
         + channel_note,
         parse_mode=ParseMode.MARKDOWN,
+        reply_markup=ForceReply(selective=True),
     )
     return AWAITING_MEDIA
 
@@ -762,7 +783,10 @@ async def handle_media(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
         media_type = "video"
         suffix = ".mp4"
     else:
-        await msg.reply_text("Please send a photo or video, or type a description.")
+        await msg.reply_text(
+            "Please send a photo or video, or type a description.",
+            reply_markup=ForceReply(selective=True),
+        )
         return AWAITING_MEDIA
 
     tmp = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
@@ -775,6 +799,7 @@ async def handle_media(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
         "Now send me a *short description* of the property "
         "(e.g. '3-bed house in Miami, $450k, pool, renovated kitchen').",
         parse_mode=ParseMode.MARKDOWN,
+        reply_markup=ForceReply(selective=True),
     )
     return AWAITING_DESCRIPTION
 
@@ -795,6 +820,7 @@ async def handle_description(update: Update, context: ContextTypes.DEFAULT_TYPE)
             "Now let's collect a few more details for the post.\n\n"
             "💰 What is the *asking price*? (e.g. $650,000 or 650k)",
             parse_mode=ParseMode.MARKDOWN,
+            reply_markup=ForceReply(selective=True),
         )
         return AWAITING_PRICE
 
@@ -813,6 +839,7 @@ async def handle_price(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
     await update.effective_message.reply_text(
         "📍 What is the *location / city*? (e.g. Ottawa, ON)",
         parse_mode=ParseMode.MARKDOWN,
+        reply_markup=ForceReply(selective=True),
     )
     return AWAITING_LOCATION
 
@@ -823,6 +850,7 @@ async def handle_location(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     await update.effective_message.reply_text(
         "🛏 How many *bedrooms*? (e.g. 3)",
         parse_mode=ParseMode.MARKDOWN,
+        reply_markup=ForceReply(selective=True),
     )
     return AWAITING_BEDROOMS
 
@@ -833,6 +861,7 @@ async def handle_bedrooms(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     await update.effective_message.reply_text(
         "🚿 How many *bathrooms*? (e.g. 2)",
         parse_mode=ParseMode.MARKDOWN,
+        reply_markup=ForceReply(selective=True),
     )
     return AWAITING_BATHROOMS
 
@@ -843,6 +872,7 @@ async def handle_bathrooms(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     await update.effective_message.reply_text(
         "📞 What is the *contact phone number*? (e.g. 613-555-1234)",
         parse_mode=ParseMode.MARKDOWN,
+        reply_markup=ForceReply(selective=True),
     )
     return AWAITING_CONTACT_PHONE
 
@@ -1325,6 +1355,7 @@ async def handle_my_chat_member(update: Update, context: ContextTypes.DEFAULT_TY
                     "replies to my messages._"
                 ),
                 parse_mode=ParseMode.MARKDOWN,
+                reply_markup=ForceReply(selective=True),
             )
         except Exception as exc:
             logger.warning(
@@ -1344,6 +1375,7 @@ async def handle_my_chat_member(update: Update, context: ContextTypes.DEFAULT_TY
                     "automatically reply to anyone who asks a question. 🏠"
                 ),
                 parse_mode=ParseMode.MARKDOWN,
+                reply_markup=ForceReply(selective=True),
             )
         except Exception as exc:
             logger.warning(
