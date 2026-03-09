@@ -689,7 +689,7 @@ async def cmd_post(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     if not await _agent_only(update, context):
         return ConversationHandler.END
     if zapier_service.is_configured():
-        channel_note = "Your post will be published to *Facebook & Instagram* automatically."
+        channel_note = "Your post will be published to *Facebook, Instagram & LinkedIn* automatically."
     elif ghl_service.is_configured():
         channel_note = "Your post will be published to *Facebook & Instagram* via the Social Planner."
     else:
@@ -821,7 +821,7 @@ async def handle_contact_phone(update: Update, context: ContextTypes.DEFAULT_TYP
         f"🛏 *Bedrooms:* {context.user_data.get(CTX_BEDROOMS, '—')}\n"
         f"🚿 *Bathrooms:* {context.user_data.get(CTX_BATHROOMS, '—')}\n"
         f"📞 *Phone:* {context.user_data.get(CTX_CONTACT_PHONE, '—')}\n\n"
-        "Confirm to publish this listing to Facebook & Instagram:"
+        "Confirm to publish this listing to Facebook, Instagram & LinkedIn:"
     )
     await update.effective_message.reply_text(
         summary,
@@ -911,7 +911,7 @@ async def handle_confirm_callback(update: Update, context: ContextTypes.DEFAULT_
             if res.get("success"):
                 url_line = f"\n🔗 Image URL: {image_url}" if image_url else ""
                 result_text = (
-                    "✅ Post sent successfully! Your listing will be published to Facebook & Instagram."
+                    "✅ Post sent successfully! Your listing will be published to Facebook, Instagram & LinkedIn."
                     + url_line
                 )
             else:
@@ -1019,15 +1019,6 @@ async def handle_platform_callback(update: Update, context: ContextTypes.DEFAULT
             result_text = f"✅ Instagram: {post_id}"
         else:
             result_text = f"❌ Instagram: {res.get('error', '')}"
-    elif platform == "linkedin":
-        res = social_poster.post_to_linkedin(
-            caption, image_path if media_type == "photo" else None
-        )
-        if res.get("success"):
-            post_id = res.get("post_id", "")
-            result_text = f"✅ LinkedIn: {post_id}"
-        else:
-            result_text = f"❌ LinkedIn: {res.get('error', '')}"
     else:
         result_text = "❌ Unknown platform or missing media."
 

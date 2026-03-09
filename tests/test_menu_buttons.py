@@ -58,8 +58,8 @@ class TestMainMenuKeyboard(unittest.TestCase):
                 for btn in row]
         self.assertIn("platform_facebook", data)
         self.assertIn("platform_instagram", data)
-        self.assertIn("platform_linkedin", data)
         self.assertIn("platform_all", data)
+        self.assertNotIn("platform_linkedin", data)
 
 
 # ── handle_menu_callback toast tests ─────────────────────────────────────────
@@ -248,12 +248,9 @@ class TestPlatformCallbackToasts(unittest.IsolatedAsyncioTestCase):
                    return_value={"success": True, "post_id": "123"}), \
              patch("bot.telegram_bot.social_poster.post_to_instagram",
                    return_value={"success": True, "post_id": "456"}), \
-             patch("bot.telegram_bot.social_poster.post_to_linkedin",
-                   return_value={"success": True, "post_id": "789"}), \
              patch("bot.telegram_bot.social_poster.post_listing",
                    return_value={"facebook": {"success": True, "post_id": "fb1"},
-                                 "instagram": {"success": True, "post_id": "ig1"},
-                                 "linkedin": {"success": True, "post_id": "li1"}}), \
+                                 "instagram": {"success": True, "post_id": "ig1"}}), \
              patch.object(context, "bot", AsyncMock()):
             context.bot.send_message = AsyncMock()
             await handle_platform_callback(update, context)
@@ -266,10 +263,6 @@ class TestPlatformCallbackToasts(unittest.IsolatedAsyncioTestCase):
     async def test_instagram_toast_contains_instagram(self):
         text = await self._platform_answer_text("platform_instagram")
         self.assertIn("Instagram", text)
-
-    async def test_linkedin_toast_contains_linkedin(self):
-        text = await self._platform_answer_text("platform_linkedin")
-        self.assertIn("linkedin", text.lower())
 
     async def test_all_platforms_toast(self):
         text = await self._platform_answer_text("platform_all")

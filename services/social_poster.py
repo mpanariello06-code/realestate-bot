@@ -18,7 +18,6 @@ from services import zapier as zapier_service
 logger = logging.getLogger(__name__)
 
 FACEBOOK_GRAPH_URL = "https://graph.facebook.com/v22.0"
-LINKEDIN_API_URL = "https://api.linkedin.com/rest"
 
 
 # ── Facebook ──────────────────────────────────────────────────────────────────
@@ -167,86 +166,6 @@ def post_to_tiktok(caption: str, video_path: str) -> dict:
         return {"success": False, "error": str(exc)}
 
 
-# ── LinkedIn ──────────────────────────────────────────────────────────────────
-
-def post_to_linkedin(caption: str, image_path: str | None = None) -> dict:
-    """
-    Publish a text or photo post to the configured LinkedIn profile / page.
-
-    Uses the LinkedIn Posts API (version 202210).  Requires a valid
-    ``LINKEDIN_ACCESS_TOKEN`` and a ``LINKEDIN_AUTHOR_URN`` such as
-    ``urn:li:person:AbCdEfGhIj`` or ``urn:li:organization:123456``.
-
-    When *image_path* is provided and the file exists, the image is uploaded
-    via the LinkedIn Images initialise-upload flow before the post is created.
-    """
-    if not config.LINKEDIN_ACCESS_TOKEN or not config.LINKEDIN_AUTHOR_URN:
-        return {"success": False, "error": "LinkedIn credentials not configured"}
-
-    headers = {
-        "Authorization": f"Bearer {config.LINKEDIN_ACCESS_TOKEN}",
-        "LinkedIn-Version": "202210",
-        "X-Restli-Protocol-Version": "2.0.0",
-        "Content-Type": "application/json",
-    }
-
-    try:
-        image_urn: str | None = None
-        if image_path and Path(image_path).exists():
-            # Step 1 – initialise upload
-            init_resp = requests.post(
-                f"{LINKEDIN_API_URL}/images?action=initializeUpload",
-                headers=headers,
-                json={"initializeUploadRequest": {"owner": config.LINKEDIN_AUTHOR_URN}},
-                timeout=30,
-            )
-            init_resp.raise_for_status()
-            init_data = init_resp.json().get("value", {})
-            upload_url = init_data.get("uploadUrl")
-            image_urn = init_data.get("image")
-
-            # Step 2 – upload binary
-            with open(image_path, "rb") as img:
-                upload_resp = requests.put(
-                    upload_url,
-                    headers={"Authorization": f"Bearer {config.LINKEDIN_ACCESS_TOKEN}"},
-                    data=img,
-                    timeout=60,
-                )
-            upload_resp.raise_for_status()
-
-        # Step 3 – create the post
-        post_body: dict = {
-            "author": config.LINKEDIN_AUTHOR_URN,
-            "commentary": caption,
-            "visibility": "PUBLIC",
-            "distribution": {
-                "feedDistribution": "MAIN_FEED",
-                "targetEntities": [],
-                "thirdPartyDistributionChannels": [],
-            },
-            "lifecycleState": "PUBLISHED",
-            "isReshareDisabledByAuthor": False,
-        }
-        if image_urn:
-            post_body["content"] = {"media": {"id": image_urn}}
-
-        post_resp = requests.post(
-            f"{LINKEDIN_API_URL}/posts",
-            headers=headers,
-            json=post_body,
-            timeout=30,
-        )
-        post_resp.raise_for_status()
-        # LinkedIn returns the post URN in the X-RestLi-Id response header
-        post_id = post_resp.headers.get("x-restli-id", "")
-        logger.info("LinkedIn post created: %s", post_id)
-        return {"success": True, "post_id": post_id}
-    except requests.RequestException as exc:
-        logger.error("LinkedIn post failed: %s", exc)
-        return {"success": False, "error": str(exc)}
-
-
 # ── Convenience wrapper ───────────────────────────────────────────────────────
 
 def post_listing(
@@ -265,8 +184,7 @@ def post_listing(
          Facebook and Instagram.
       2. GHL Social Planner (when GHL_API_KEY + GHL_LOCATION_ID are set) –
          publishes via Go High Level.
-      3. Direct Facebook / Instagram / LinkedIn Graph & REST APIs
-         (always-available fallback).
+      3. Direct Facebook/Instagram Graph API (always-available fallback).
 
     Parameters
     ----------
@@ -302,6 +220,5 @@ def post_listing(
     else:
         results["instagram"] = {"success": False, "error": "image_url required for Instagram"}
 
-    results["linkedin"] = post_to_linkedin(caption, image_path)
 
     return results

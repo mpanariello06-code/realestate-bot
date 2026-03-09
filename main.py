@@ -52,6 +52,7 @@ from datetime import datetime
 
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
+from telegram import Update
 
 import config
 from bot.telegram_bot import build_application
@@ -120,7 +121,10 @@ def main():
 
     try:
         logger.info("Telegram bot polling started. Press Ctrl+C to stop.")
-        application.run_polling(drop_pending_updates=True)
+        application.run_polling(
+            drop_pending_updates=True,
+            allowed_updates=Update.ALL_TYPES,
+        )
     finally:
         scheduler.shutdown(wait=False)
         logger.info("Bot stopped.")

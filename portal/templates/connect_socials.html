@@ -35,21 +35,17 @@ TIKTOK_ACCESS_TOKEN=your_token
 TIKTOK_OPEN_ID=your_open_id</pre>
 
   <h2 style="font-size:1.05rem;margin:.75rem 0">💼 LinkedIn</h2>
+  <p style="color:var(--muted);line-height:1.8">
+    LinkedIn posting is handled automatically via your <strong>Zapier</strong> integration — no separate LinkedIn API credentials are needed.
+    When you tap <em>Post Listing</em> and Zapier is configured, the bot sends the full listing payload to your Zap,
+    which can then publish to LinkedIn (and any other platforms you have connected in your Zap) automatically.
+  </p>
   <ol style="margin-left:1.25rem;line-height:2">
-    <li>Go to <a href="https://www.linkedin.com/developers/apps" target="_blank">LinkedIn Developers</a> and create an app.</li>
-    <li>Add the <strong>Share on LinkedIn</strong> and <strong>Sign In with LinkedIn using OpenID Connect</strong> products.</li>
-    <li>Generate an <strong>OAuth 2.0 Access Token</strong> with the <code>w_member_social</code> scope (personal profile) or <code>w_organization_social</code> scope (company page).</li>
-    <li>Find your <strong>Author URN</strong>:
-      <ul style="margin-left:1.25rem">
-        <li>Personal profile: <code>urn:li:person:&lt;your_person_id&gt;</code> (retrieve via the <code>/v2/userinfo</code> endpoint).</li>
-        <li>Company page: <code>urn:li:organization:&lt;your_org_id&gt;</code> (found in the LinkedIn admin URL).</li>
-      </ul>
-    </li>
-    <li>Paste the values into <code>.env</code>:</li>
+    <li>In your Zapier account, open the Zap connected to this bot's webhook URL.</li>
+    <li>Add a <strong>LinkedIn action</strong> step (e.g. <em>Create Share Update</em> or <em>Create Company Update</em>).</li>
+    <li>Map the <code>description</code>, <code>image_url</code>, and other fields from the webhook payload to the LinkedIn action.</li>
+    <li>Turn the Zap on — LinkedIn posts will now be published alongside Facebook &amp; Instagram.</li>
   </ol>
-  <pre style="background:var(--bg);padding:1rem;border-radius:6px;margin-top:.5rem;font-size:.82rem;overflow-x:auto">
-LINKEDIN_ACCESS_TOKEN=your_access_token
-LINKEDIN_AUTHOR_URN=urn:li:organization:123456</pre>
 
   <h2 style="font-size:1.05rem;margin:.75rem 0">📊 Google Sheets</h2>
   <ol style="margin-left:1.25rem;line-height:2">
