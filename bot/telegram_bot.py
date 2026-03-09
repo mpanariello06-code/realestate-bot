@@ -38,6 +38,9 @@ from typing import Optional
 from telegram import (
     Bot,
     BotCommand,
+    Chat,
+    ChatAdministratorRights,
+    ChatMember,
     InlineKeyboardButton,
     InlineKeyboardMarkup,
     Message,
@@ -47,6 +50,7 @@ from telegram.constants import ParseMode
 from telegram.ext import (
     Application,
     CallbackQueryHandler,
+    ChatMemberHandler,
     CommandHandler,
     ContextTypes,
     ConversationHandler,
@@ -232,6 +236,41 @@ async def _bot_send_with_banner(
 
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     global _bot_paused
+    chat = update.effective_chat
+
+    # ── Group / Supergroup: check admin status and guide setup ────────────────
+    if chat and chat.type in (Chat.GROUP, Chat.SUPERGROUP):
+        try:
+            bot_member = await context.bot.get_chat_member(chat.id, context.bot.id)
+            is_admin = bot_member.status == ChatMember.ADMINISTRATOR
+        except Exception as exc:
+            logger.warning("cmd_start: could not get bot member status: %s", exc)
+            is_admin = False
+
+        if is_admin:
+            await update.effective_message.reply_text(
+                "✅ *All set!*\n\n"
+                "I'm an Administrator in this group and can see every message. "
+                "I'll reply automatically to anyone who writes a question here. 🏠",
+                parse_mode=ParseMode.MARKDOWN,
+            )
+        else:
+            await update.effective_message.reply_text(
+                "⚙️ *Group Setup Needed*\n\n"
+                "To respond to *every message* in this group (not just "
+                "commands and replies), I need to be made an *Administrator*.\n\n"
+                "Ask a group admin to:\n"
+                "1️⃣ Open *Group Settings → Administrators*\n"
+                "2️⃣ Tap *Add Admin* and select this bot\n"
+                "3️⃣ Enable at least the *\"Manage Group\"* permission\n\n"
+                "Once done, type /start again to confirm.\n\n"
+                "_Until then I can only respond to /commands and messages "
+                "that are direct replies to my messages._",
+                parse_mode=ParseMode.MARKDOWN,
+            )
+        return
+
+    # ── Private chat: normal agent flow ──────────────────────────────────────
     if not _is_agent(update):
         if update.effective_message:
             await update.effective_message.reply_text(
@@ -1221,6 +1260,9 @@ async def handle_auto_reply(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     msg = update.effective_message
     if not msg:
         return
+    # Never reply to other bots – prevents echo loops in group chats.
+    if msg.from_user and msg.from_user.is_bot:
+        return
     if msg.text:
         reply = lead_qualifier.generate_auto_reply(msg.text)
     else:
@@ -1232,6 +1274,82 @@ async def handle_auto_reply(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         await _send_with_banner(msg, reply, parse_mode=None)
     except Exception:
         logger.exception("handle_auto_reply: failed to send reply")
+
+
+# ── Group chat member handler ─────────────────────────────────────────────────
+
+async def handle_my_chat_member(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """React to changes in the bot's own membership status in group chats.
+
+    When the bot is **added as a regular member** it immediately explains that
+    it needs Administrator rights to see all messages (not just commands and
+    replies).  When the bot is **promoted to Administrator** it confirms that
+    it can now respond to every message automatically.
+
+    Background: Telegram's *Group Privacy Mode* (enabled by default for every
+    bot) prevents the bot from receiving regular group messages.  Bots with
+    Administrator status bypass this restriction and receive all messages,
+    which is required for the auto-reply feature to work in groups.
+    """
+    event = update.my_chat_member
+    if not event:
+        return
+
+    chat = event.chat
+    if chat.type not in (Chat.GROUP, Chat.SUPERGROUP):
+        return
+
+    old_status = event.old_chat_member.status
+    new_status = event.new_chat_member.status
+
+    was_absent = old_status in (ChatMember.LEFT, ChatMember.BANNED)
+    is_now_member = new_status == ChatMember.MEMBER
+    is_now_admin = new_status == ChatMember.ADMINISTRATOR
+
+    if was_absent and is_now_member:
+        # Bot was just added as a regular (non-admin) member.
+        try:
+            await context.bot.send_message(
+                chat_id=chat.id,
+                text=(
+                    "👋 *Real Estate Assistant has joined!*\n\n"
+                    "⚙️ *One quick setup step:*\n\n"
+                    "To respond to *every message* in this group (not just "
+                    "commands and replies to my messages), I need to be made "
+                    "an *Administrator*.\n\n"
+                    "Ask a group admin to:\n"
+                    "1️⃣ Open *Group Settings → Administrators*\n"
+                    "2️⃣ Tap *Add Admin* and select this bot\n"
+                    "3️⃣ Enable at least the *\"Manage Group\"* permission\n\n"
+                    "_Until then I can only respond to /commands and direct "
+                    "replies to my messages._"
+                ),
+                parse_mode=ParseMode.MARKDOWN,
+            )
+        except Exception as exc:
+            logger.warning(
+                "handle_my_chat_member: could not send setup message to %s: %s",
+                chat.id, exc,
+            )
+        return
+
+    if is_now_admin:
+        # Bot was just promoted to Administrator — confirm it can see everything.
+        try:
+            await context.bot.send_message(
+                chat_id=chat.id,
+                text=(
+                    "✅ *All set! I'm now an Administrator.*\n\n"
+                    "I can see every message in this group and will "
+                    "automatically reply to anyone who asks a question. 🏠"
+                ),
+                parse_mode=ParseMode.MARKDOWN,
+            )
+        except Exception as exc:
+            logger.warning(
+                "handle_my_chat_member: could not send admin confirmation to %s: %s",
+                chat.id, exc,
+            )
 
 
 # ── Build Application ─────────────────────────────────────────────────────────
@@ -1261,6 +1379,24 @@ async def _on_startup(app: Application) -> None:
         logger.info("Telegram command menu registered (%d commands).", len(_BOT_COMMANDS))
     except Exception as exc:
         logger.warning("Could not set bot commands: %s", exc)
+
+    # Set default admin rights so group admins get a one-click grant that
+    # includes the ability to read all group messages (admin bots bypass
+    # Telegram's Group Privacy Mode).
+    try:
+        await app.bot.set_my_default_administrator_rights(
+            rights=ChatAdministratorRights(
+                can_manage_chat=True,
+                can_invite_users=False,
+                can_delete_messages=False,
+                can_restrict_members=False,
+                can_promote_members=False,
+                can_change_info=False,
+            ),
+        )
+        logger.info("Default administrator rights configured for group chats.")
+    except Exception as exc:
+        logger.warning("Could not set default administrator rights: %s", exc)
 
     # Send "bot is online" welcome message to each authorised agent
     if not config.AGENT_CHAT_IDS:
@@ -1386,6 +1522,12 @@ def build_application() -> Application:
             handle_menu_callback,
             pattern="^(qualify_lead|performance|qualified_leads|all_leads|weekly_report|zapier_status|ghl_status|notes_info|help|stop_bot|start_bot)$",
         )
+    )
+
+    # Group membership handler — detects when the bot is added to a group or
+    # promoted to admin and sends the appropriate setup/confirmation message.
+    app.add_handler(
+        ChatMemberHandler(handle_my_chat_member, ChatMemberHandler.MY_CHAT_MEMBER)
     )
 
     # Catch-all: auto-reply to any message not handled above.

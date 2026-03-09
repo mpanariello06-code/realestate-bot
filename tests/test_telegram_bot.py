@@ -410,6 +410,7 @@ class TestHandleAutoReply(unittest.IsolatedAsyncioTestCase):
         update = MagicMock()
         update.effective_chat.id = chat_id
         update.effective_message.text = text
+        update.effective_message.from_user.is_bot = False
         update.effective_message.reply_text = AsyncMock()
         return update
 
@@ -490,6 +491,26 @@ class TestHandleAutoReply(unittest.IsolatedAsyncioTestCase):
 
     @patch("bot.telegram_bot.lead_qualifier.generate_auto_reply",
            return_value="Should not be sent")
+    async def test_auto_reply_skips_bot_messages(self, mock_reply):
+        """Messages from other bots must be silently ignored (no echo loops)."""
+        from bot.telegram_bot import handle_auto_reply
+        import bot.telegram_bot as tb
+
+        tb._bot_paused = False
+        update = self._make_text_update(chat_id=999)
+        update.effective_message.from_user.is_bot = True  # sender is a bot
+        context = MagicMock()
+
+        with patch("bot.telegram_bot.config") as mock_cfg:
+            mock_cfg.TELEGRAM_AUTO_REPLY_ENABLED = True
+            mock_cfg.AGENT_CHAT_IDS = []
+            mock_cfg.BOT_BANNER_IMAGE = ""
+            await handle_auto_reply(update, context)
+
+        update.effective_message.reply_text.assert_not_called()
+
+    @patch("bot.telegram_bot.lead_qualifier.generate_auto_reply",
+           return_value="Should not be sent")
     async def test_auto_reply_skips_when_no_message(self, mock_reply):
         """No reply sent when effective_message is None."""
         from bot.telegram_bot import handle_auto_reply
@@ -514,6 +535,7 @@ class TestHandleAutoReply(unittest.IsolatedAsyncioTestCase):
         update = MagicMock()
         # Simulate a sticker message: text is None but sticker is present
         update.effective_message.text = None
+        update.effective_message.from_user.is_bot = False
         update.effective_message.sticker = MagicMock()  # real sticker payload
         update.effective_message.voice = None
         update.effective_message.audio = None
@@ -540,6 +562,7 @@ class TestHandleAutoReply(unittest.IsolatedAsyncioTestCase):
         tb._bot_paused = False
         update = MagicMock()
         update.effective_message.text = None
+        update.effective_message.from_user.is_bot = False
         update.effective_message.voice = MagicMock()  # real voice payload
         update.effective_message.sticker = None
         update.effective_message.reply_text = AsyncMock()
@@ -554,6 +577,78 @@ class TestHandleAutoReply(unittest.IsolatedAsyncioTestCase):
         update.effective_message.reply_text.assert_awaited_once()
         sent_text = update.effective_message.reply_text.call_args[0][0]
         self.assertIn("text", sent_text.lower())
+
+
+class TestHandleMyChatMember(unittest.IsolatedAsyncioTestCase):
+    """Tests for the group membership handler (handle_my_chat_member)."""
+
+    def _make_member_update(self, chat_type, old_status, new_status):
+        from unittest.mock import MagicMock
+        update = MagicMock()
+        update.my_chat_member.chat.type = chat_type
+        update.my_chat_member.old_chat_member.status = old_status
+        update.my_chat_member.new_chat_member.status = new_status
+        return update
+
+    async def test_sends_setup_message_when_added_as_member(self):
+        """Bot should request admin when it is first added to a group."""
+        from telegram import Chat, ChatMember
+        from bot.telegram_bot import handle_my_chat_member
+
+        update = self._make_member_update(
+            chat_type=Chat.GROUP,
+            old_status=ChatMember.LEFT,
+            new_status=ChatMember.MEMBER,
+        )
+        update.my_chat_member.chat.id = -100123
+
+        context = MagicMock()
+        context.bot.send_message = AsyncMock()
+
+        await handle_my_chat_member(update, context)
+
+        context.bot.send_message.assert_awaited_once()
+        sent_text = context.bot.send_message.call_args[1]["text"]
+        self.assertIn("Administrator", sent_text)
+
+    async def test_sends_confirmation_when_promoted_to_admin(self):
+        """Bot should confirm it is ready when promoted to Administrator."""
+        from telegram import Chat, ChatMember
+        from bot.telegram_bot import handle_my_chat_member
+
+        update = self._make_member_update(
+            chat_type=Chat.SUPERGROUP,
+            old_status=ChatMember.MEMBER,
+            new_status=ChatMember.ADMINISTRATOR,
+        )
+        update.my_chat_member.chat.id = -100456
+
+        context = MagicMock()
+        context.bot.send_message = AsyncMock()
+
+        await handle_my_chat_member(update, context)
+
+        context.bot.send_message.assert_awaited_once()
+        sent_text = context.bot.send_message.call_args[1]["text"]
+        self.assertIn("Administrator", sent_text)
+
+    async def test_ignores_private_chat_member_events(self):
+        """Private chat member updates should be silently ignored."""
+        from telegram import Chat, ChatMember
+        from bot.telegram_bot import handle_my_chat_member
+
+        update = self._make_member_update(
+            chat_type=Chat.PRIVATE,
+            old_status=ChatMember.LEFT,
+            new_status=ChatMember.MEMBER,
+        )
+
+        context = MagicMock()
+        context.bot.send_message = AsyncMock()
+
+        await handle_my_chat_member(update, context)
+
+        context.bot.send_message.assert_not_called()
 
 
 class TestSendWithBanner(unittest.IsolatedAsyncioTestCase):
@@ -667,6 +762,7 @@ class TestSendWithBanner(unittest.IsolatedAsyncioTestCase):
         tb._bot_paused = False
         update = MagicMock()
         update.effective_message.text = "What properties do you have?"
+        update.effective_message.from_user.is_bot = False
         update.effective_message.reply_photo = AsyncMock()
         update.effective_message.reply_text = AsyncMock()
         context = MagicMock()
