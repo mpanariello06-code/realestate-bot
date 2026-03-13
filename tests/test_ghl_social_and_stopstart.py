@@ -3,9 +3,9 @@ Tests for:
   1. GHL Social Planner posting (upload_media, get_social_accounts,
      post_to_social_planner)
   2. social_poster.post_listing() routing through GHL
-  3. Stop Bot / Start Bot buttons and _agent_only pause guard
+  3. Stop Marcello / Start Assistant buttons and _agent_only offline guard
   4. handle_confirm_callback GHL direct-post path
-  5. keyboards: start_bot_keyboard and Stop Bot button in main menu
+  5. keyboards: start_bot_keyboard and Stop Marcello button in main menu
 """
 from __future__ import annotations
 
@@ -250,7 +250,7 @@ class TestStopStartBot(unittest.IsolatedAsyncioTestCase):
         context = MagicMock()
         await tb.cmd_stop_bot(update, context)
         reply_text = update.effective_message.reply_text.call_args[0][0]
-        self.assertIn("Paused", reply_text)
+        self.assertIn("Offline", reply_text)
         kwargs = update.effective_message.reply_text.call_args[1]
         from bot.keyboards import start_bot_keyboard
         self.assertEqual(
@@ -273,7 +273,7 @@ class TestStopStartBot(unittest.IsolatedAsyncioTestCase):
         context = MagicMock()
         await tb.cmd_start_bot(update, context)
         reply_text = update.effective_message.reply_text.call_args[0][0]
-        self.assertIn("Running", reply_text)
+        self.assertIn("Online", reply_text)
 
     async def test_cmd_stop_bot_unauthorised_user_does_nothing(self):
         import bot.telegram_bot as tb
@@ -307,7 +307,7 @@ class TestAgentOnlyPauseGuard(unittest.IsolatedAsyncioTestCase):
         context = MagicMock()
         await tb._agent_only(update, context)
         reply_text = update.effective_message.reply_text.call_args[0][0]
-        self.assertIn("paused", reply_text.lower())
+        self.assertIn("offline", reply_text.lower())
         kwargs = update.effective_message.reply_text.call_args[1]
         from bot.keyboards import start_bot_keyboard
         self.assertEqual(

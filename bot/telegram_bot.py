@@ -136,12 +136,14 @@ def _is_agent(update: Update) -> bool:
 
 
 async def _agent_only(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
-    """Return False (and send a message) if not an agent or bot is paused."""
+    """Return False (and send a message) if not an agent or assistant is offline."""
     if _bot_paused:
         if update.effective_message:
             await update.effective_message.reply_text(
-                "⏹ *Bot is paused.*\n\n"
-                "Tap the button below to resume.",
+                f"🔴 *Marcello is Offline*\n"
+                f"{_HR}\n\n"
+                "The assistant is currently offline.\n\n"
+                "Tap *▶️ Start Assistant* below to bring Marcello back online.",
                 parse_mode=ParseMode.MARKDOWN,
                 reply_markup=start_bot_keyboard(),
             )
@@ -350,8 +352,8 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         "`/ghl`     — CRM integration status\n"
         "`/zapier`  — Automation status\n\n"
         "*🔧 Bot Control*\n"
-        "`/stopbot`   — Pause the bot\n"
-        "`/startbot`  — Resume the bot\n"
+        "`/stopbot`   — Take Marcello offline\n"
+        "`/startbot`  — Bring Marcello back online\n"
         "`/myid`      — Show your Telegram chat ID\n\n"
         f"{_HR}\n"
         "💡 _Tap any button below for quick access._",
@@ -1315,29 +1317,29 @@ async def handle_lead_action(update: Update, context: ContextTypes.DEFAULT_TYPE)
 # ── Stop / Start Bot ─────────────────────────────────────────────────────────
 
 async def cmd_stop_bot(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Pause the bot – all agent-only commands will return a paused message."""
+    """Take the assistant offline – all agent-only commands return the offline message."""
     global _bot_paused
     if not _is_agent(update):
         return
     _bot_paused = True
     await update.effective_message.reply_text(
-        f"⏹ *Bot Paused*\n"
+        f"🔴 *Marcello is Offline*\n"
         f"{_HR}\n\n"
-        "All bot functions are now disabled.\n\n"
-        "Tap *▶️ Start Bot* below to resume when you're ready.",
+        "The assistant is now offline. All bot functions are disabled.\n\n"
+        "Tap *▶️ Start Assistant* below to bring Marcello back online.",
         parse_mode=ParseMode.MARKDOWN,
         reply_markup=start_bot_keyboard(),
     )
 
 
 async def cmd_start_bot(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Resume the bot after it has been paused."""
+    """Bring the assistant back online after it has been taken offline."""
     global _bot_paused
     if not _is_agent(update):
         return
     _bot_paused = False
     await update.effective_message.reply_text(
-        f"✅ *Bot is Running*\n"
+        f"✅ *Marcello is Online*\n"
         f"{_HR}\n\n"
         "All functions are active.\n\n"
         "Tap a button below to get started 👇",
@@ -1360,8 +1362,8 @@ _MENU_TOASTS: dict[str, str] = {
     "ghl_status":      "🔗 Loading GHL status…",
     "notes_info":      "📝 Opening notes guide…",
     "help":            "❓ Loading help…",
-    "stop_bot":        "⏹ Pausing bot…",
-    "start_bot":       "▶️ Starting bot…",
+    "stop_bot":        "⏹ Taking Marcello offline…",
+    "start_bot":       "▶️ Starting Assistant…",
 }
 
 
@@ -1373,9 +1375,9 @@ async def handle_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYP
     if query.data == "start_bot":
         if _is_agent(update):
             _bot_paused = False
-            await query.answer("▶️ Bot started!")
+            await query.answer("▶️ Assistant started!")
             await query.edit_message_text(
-                f"✅ *Bot is Running*\n"
+                f"✅ *Marcello is Online*\n"
                 f"{_HR}\n\n"
                 "All functions are active.\n\n"
                 "Tap a button below to get started 👇",
@@ -1390,12 +1392,12 @@ async def handle_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYP
     if query.data == "stop_bot":
         if _is_agent(update):
             _bot_paused = True
-            await query.answer("⏹ Bot paused")
+            await query.answer("⏹ Marcello offline")
             await query.edit_message_text(
-                f"⏹ *Bot Paused*\n"
+                f"🔴 *Marcello is Offline*\n"
                 f"{_HR}\n\n"
-                "All bot functions are now disabled.\n\n"
-                "Tap *▶️ Start Bot* below to resume.",
+                "The assistant is now offline. All bot functions are disabled.\n\n"
+                "Tap *▶️ Start Assistant* below to bring Marcello back online.",
                 parse_mode=ParseMode.MARKDOWN,
                 reply_markup=start_bot_keyboard(),
             )
@@ -1403,13 +1405,13 @@ async def handle_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYP
             await query.answer()
         return
 
-    # ── All other callbacks: blocked when paused ──────────────────────────
+    # ── All other callbacks: blocked when assistant is offline ────────────
     if _bot_paused:
-        await query.answer("⏹ Bot is paused")
+        await query.answer("🔴 Marcello is offline")
         await query.edit_message_text(
-            f"⏹ *Bot Paused*\n"
+            f"🔴 *Marcello is Offline*\n"
             f"{_HR}\n\n"
-            "Tap *▶️ Start Bot* below to resume.",
+            "Tap *▶️ Start Assistant* below to bring Marcello back online.",
             parse_mode=ParseMode.MARKDOWN,
             reply_markup=start_bot_keyboard(),
         )

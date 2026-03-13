@@ -12,7 +12,7 @@ def main_menu_keyboard() -> InlineKeyboardMarkup:
       2. Lead reports    — Qualified Leads | All Leads
       3. Analytics       — Performance | Weekly Report
       4. Utilities       — Integrations | Notes | Help
-      5. Control         — Stop Bot  (alone, reduces accidental taps)
+      5. Control         — Stop Marcello  (alone, reduces accidental taps)
     """
     return InlineKeyboardMarkup([
         [
@@ -33,16 +33,16 @@ def main_menu_keyboard() -> InlineKeyboardMarkup:
             InlineKeyboardButton("❓ Help",            callback_data="help"),
         ],
         [
-            InlineKeyboardButton("⏹ Stop Bot",        callback_data="stop_bot"),
+            InlineKeyboardButton("⏹ Stop Marcello",   callback_data="stop_bot"),
         ],
     ])
 
 
 def start_bot_keyboard() -> InlineKeyboardMarkup:
-    """Shown when the bot is paused – only the Start Bot button is active."""
+    """Shown when the assistant is offline – only the Start Assistant button is active."""
     return InlineKeyboardMarkup([
         [
-            InlineKeyboardButton("▶️ Start Bot", callback_data="start_bot"),
+            InlineKeyboardButton("▶️ Start Assistant", callback_data="start_bot"),
         ],
     ])
 
