@@ -50,6 +50,7 @@ from telegram import (
     Update,
 )
 from telegram.constants import ParseMode
+from telegram.error import BadRequest
 from telegram.ext import (
     Application,
     CallbackQueryHandler,
@@ -91,6 +92,21 @@ _HR2 = "─" * 28   # secondary / sub-section divider
 # Whether the bot is paused (Stop Bot was pressed).
 # When True every agent-only command/callback returns a paused message.
 _bot_paused: bool = False
+
+
+async def _safe_edit(query, text: str, **kwargs) -> None:
+    """Edit the callback query's message text.
+
+    Telegram raises ``BadRequest: There is no text in the message to edit``
+    when the original message is a photo/video/document (media messages have a
+    *caption*, not *text*).  In that case we fall back to posting a new reply
+    so the user always receives the response.
+    """
+    try:
+        await query.edit_message_text(text, **kwargs)
+    except BadRequest as exc:
+        logger.debug("edit_message_text failed (%s) – replying instead", exc)
+        await query.message.reply_text(text, **kwargs)
 
 # Conversation states
 (
@@ -559,7 +575,7 @@ async def handle_qualify_save_callback(
     if query.data == "qualify_discard":
         await query.answer("🗑 Discarded")
         context.user_data.pop(CTX_QUALIFY_RESULT, None)
-        await query.edit_message_text("🗑 Lead discarded.")
+        await _safe_edit(query, "🗑 Lead discarded.")
         return ConversationHandler.END
 
     if query.data == "qualify_save":
@@ -568,9 +584,10 @@ async def handle_qualify_save_callback(
         result.setdefault("platform", "telegram")
         saved = sheets.save_lead(result)
         if saved:
-            await query.edit_message_text("✅ Lead saved to your Google Sheet!")
+            await _safe_edit(query, "✅ Lead saved to your Google Sheet!")
         else:
-            await query.edit_message_text(
+            await _safe_edit(
+                query,
                 "❌ Could not save lead – check your Google Sheets connection."
             )
         return ConversationHandler.END
@@ -1092,19 +1109,19 @@ async def handle_confirm_callback(update: Update, context: ContextTypes.DEFAULT_
     if query.data == "cancel":
         await query.answer("❌ Cancelled")
         _cleanup_media(context)
-        await query.edit_message_text("❌ Post cancelled.")
+        await _safe_edit(query, "❌ Post cancelled.")
         return ConversationHandler.END
 
     if query.data == "edit_caption":
         await query.answer("✏️ Edit mode")
-        await query.edit_message_text("✏️ Please type your new caption:")
+        await _safe_edit(query, "✏️ Please type your new caption:")
         return AWAITING_CAPTION_EDIT
 
     if query.data == "confirm_post":
         # ── Zapier path (preferred) ───────────────────────────────────────────
         if zapier_service.is_configured():
             await query.answer("🚀 Publishing listing…")
-            await query.edit_message_text("🚀 Uploading photo and publishing your listing…")
+            await _safe_edit(query, "🚀 Uploading photo and publishing your listing…")
 
             image_path = context.user_data.get(CTX_MEDIA_PATH)
             media_type = context.user_data.get(CTX_MEDIA_TYPE, "photo")
@@ -1176,7 +1193,7 @@ async def handle_confirm_callback(update: Update, context: ContextTypes.DEFAULT_
             caption = context.user_data.get(CTX_CAPTION, "")
             image_path = context.user_data.get(CTX_MEDIA_PATH)
             media_type = context.user_data.get(CTX_MEDIA_TYPE, "photo")
-            await query.edit_message_text("🚀 Posting via GHL Social Planner…")
+            await _safe_edit(query, "🚀 Posting via GHL Social Planner…")
             res = ghl_service.post_to_social_planner(
                 caption,
                 image_path if media_type == "photo" else None,
@@ -1197,7 +1214,8 @@ async def handle_confirm_callback(update: Update, context: ContextTypes.DEFAULT_
 
         # ── Fallback: let agent choose platform (direct API) ──────────────────
         await query.answer("📱 Choosing platform…")
-        await query.edit_message_text(
+        await _safe_edit(
+            query,
             "📱 Select which platform(s) to post to:",
             reply_markup=posting_platform_keyboard(),
         )
@@ -1213,7 +1231,7 @@ async def handle_platform_callback(update: Update, context: ContextTypes.DEFAULT
     if query.data == "cancel":
         await query.answer("❌ Cancelled")
         _cleanup_media(context)
-        await query.edit_message_text("❌ Post cancelled.")
+        await _safe_edit(query, "❌ Post cancelled.")
         return ConversationHandler.END
 
     platform = query.data.replace("platform_", "")
@@ -1224,7 +1242,7 @@ async def handle_platform_callback(update: Update, context: ContextTypes.DEFAULT
     image_path = context.user_data.get(CTX_MEDIA_PATH)
     media_type = context.user_data.get(CTX_MEDIA_TYPE, "photo")
 
-    await query.edit_message_text(f"🚀 Posting to {platform.title()}…")
+    await _safe_edit(query, f"🚀 Posting to {platform.title()}…")
 
     if platform == "all":
         results = social_poster.post_listing(
@@ -1376,7 +1394,8 @@ async def handle_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYP
         if _is_agent(update):
             _bot_paused = False
             await query.answer("▶️ Assistant started!")
-            await query.edit_message_text(
+            await _safe_edit(
+                query,
                 f"✅ *Marcello is Online*\n"
                 f"{_HR}\n\n"
                 "All functions are active.\n\n"
@@ -1393,7 +1412,8 @@ async def handle_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYP
         if _is_agent(update):
             _bot_paused = True
             await query.answer("⏹ Marcello offline")
-            await query.edit_message_text(
+            await _safe_edit(
+                query,
                 f"🔴 *Marcello is Offline*\n"
                 f"{_HR}\n\n"
                 "The assistant is now offline. All bot functions are disabled.\n\n"
@@ -1408,7 +1428,8 @@ async def handle_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYP
     # ── All other callbacks: blocked when assistant is offline ────────────
     if _bot_paused:
         await query.answer("🔴 Marcello is offline")
-        await query.edit_message_text(
+        await _safe_edit(
+            query,
             f"🔴 *Marcello is Offline*\n"
             f"{_HR}\n\n"
             "Tap *▶️ Start Assistant* below to bring Marcello back online.",

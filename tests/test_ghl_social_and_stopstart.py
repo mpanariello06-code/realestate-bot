@@ -367,6 +367,91 @@ class TestMenuCallbackStopStart(unittest.IsolatedAsyncioTestCase):
         update.callback_query.answer.assert_awaited()
 
 
+class TestSafeEdit(unittest.IsolatedAsyncioTestCase):
+    """_safe_edit falls back to reply_text when edit_message_text raises BadRequest."""
+
+    def setUp(self):
+        import bot.telegram_bot as tb
+        tb._bot_paused = False
+
+    async def test_safe_edit_uses_edit_when_message_has_text(self):
+        """When edit_message_text succeeds the reply is an edit, not a new message."""
+        from bot.telegram_bot import _safe_edit
+        from telegram.error import BadRequest
+
+        query = AsyncMock()
+        query.edit_message_text = AsyncMock()
+        query.message = MagicMock()
+        query.message.reply_text = AsyncMock()
+
+        await _safe_edit(query, "Hello", parse_mode="Markdown")
+
+        query.edit_message_text.assert_awaited_once_with("Hello", parse_mode="Markdown")
+        query.message.reply_text.assert_not_awaited()
+
+    async def test_safe_edit_falls_back_to_reply_on_bad_request(self):
+        """When edit_message_text raises BadRequest, reply_text is called instead."""
+        from bot.telegram_bot import _safe_edit
+        from telegram.error import BadRequest
+
+        query = AsyncMock()
+        query.edit_message_text = AsyncMock(
+            side_effect=BadRequest("There is no text in the message to edit")
+        )
+        query.message = MagicMock()
+        query.message.reply_text = AsyncMock()
+
+        await _safe_edit(query, "Fallback msg", parse_mode="Markdown")
+
+        query.message.reply_text.assert_awaited_once_with(
+            "Fallback msg", parse_mode="Markdown"
+        )
+
+    async def test_stop_bot_on_media_message_does_not_crash(self):
+        """Tapping Stop Marcello on a photo message must not raise BadRequest."""
+        import bot.telegram_bot as tb
+        from telegram.error import BadRequest
+
+        tb._bot_paused = False
+        update = _make_callback_update("stop_bot", chat_id=123)
+        # Simulate the original message being a photo (edit_message_text would fail)
+        update.callback_query.edit_message_text = AsyncMock(
+            side_effect=BadRequest("There is no text in the message to edit")
+        )
+        update.callback_query.message = MagicMock()
+        update.callback_query.message.reply_text = AsyncMock()
+
+        context = MagicMock()
+        # Should complete without raising
+        await tb.handle_menu_callback(update, context)
+
+        self.assertTrue(tb._bot_paused)
+        update.callback_query.message.reply_text.assert_awaited_once()
+        reply_text = update.callback_query.message.reply_text.call_args[0][0]
+        self.assertIn("Offline", reply_text)
+
+    async def test_start_bot_on_media_message_does_not_crash(self):
+        """Tapping Start Assistant on a photo message must not raise BadRequest."""
+        import bot.telegram_bot as tb
+        from telegram.error import BadRequest
+
+        tb._bot_paused = True
+        update = _make_callback_update("start_bot", chat_id=123)
+        update.callback_query.edit_message_text = AsyncMock(
+            side_effect=BadRequest("There is no text in the message to edit")
+        )
+        update.callback_query.message = MagicMock()
+        update.callback_query.message.reply_text = AsyncMock()
+
+        context = MagicMock()
+        await tb.handle_menu_callback(update, context)
+
+        self.assertFalse(tb._bot_paused)
+        update.callback_query.message.reply_text.assert_awaited_once()
+        reply_text = update.callback_query.message.reply_text.call_args[0][0]
+        self.assertIn("Online", reply_text)
+
+
 # ── handle_confirm_callback GHL direct-post path ─────────────────────────────
 
 class TestConfirmCallbackGhlPath(unittest.IsolatedAsyncioTestCase):
