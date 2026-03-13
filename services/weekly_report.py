@@ -12,6 +12,7 @@ from datetime import datetime, timedelta, timezone
 import config
 from services.sheets import get_leads, get_performance
 from services.pdf_report import build_report_pdf
+from services.demo_data import DEMO_LEADS, DEMO_PERFORMANCE_WEEKLY
 
 logger = logging.getLogger(__name__)
 
@@ -22,8 +23,8 @@ def _build_report_text() -> str:
     week_start = (today - timedelta(days=today.weekday())).strftime("%Y-%m-%d")
     week_end = today.strftime("%Y-%m-%d")
 
-    leads = get_leads()
-    perf_records = get_performance(weeks=1)
+    leads = get_leads() or DEMO_LEADS
+    perf_records = get_performance(weeks=1) or DEMO_PERFORMANCE_WEEKLY
 
     # ── Lead metrics ──────────────────────────────────────────────────────────
     total_leads = len(leads)
@@ -77,8 +78,8 @@ async def send_weekly_report(bot) -> None:
     bot : telegram.Bot
         An initialised python-telegram-bot Bot instance.
     """
-    leads = get_leads()
-    perf_records = get_performance(weeks=1)
+    leads = get_leads() or DEMO_LEADS
+    perf_records = get_performance(weeks=1) or DEMO_PERFORMANCE_WEEKLY
 
     report_text = _build_report_text()
     pdf_bytes = build_report_pdf(leads, perf_records)

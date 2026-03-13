@@ -84,6 +84,7 @@ class TestMenuCallbackToasts(unittest.IsolatedAsyncioTestCase):
         context.user_data = {}
         with patch("bot.telegram_bot.cmd_performance"), \
              patch("bot.telegram_bot.cmd_leads"), \
+             patch("bot.telegram_bot.cmd_all_leads"), \
              patch("bot.telegram_bot.cmd_report"), \
              patch("bot.telegram_bot.cmd_ghl"), \
              patch("bot.telegram_bot.cmd_help"), \
@@ -102,7 +103,7 @@ class TestMenuCallbackToasts(unittest.IsolatedAsyncioTestCase):
         answer = await self._run_callback("qualify_lead")
         answer.assert_awaited_once()
         text = answer.call_args[0][0] if answer.call_args[0] else ""
-        self.assertIn("🔍", text)
+        self.assertIn("qualify", text.lower())
 
     async def test_ghl_status_toast(self):
         answer = await self._run_callback("ghl_status")
@@ -120,7 +121,7 @@ class TestMenuCallbackToasts(unittest.IsolatedAsyncioTestCase):
         answer = await self._run_callback("help")
         answer.assert_awaited_once()
         text = answer.call_args[0][0] if answer.call_args[0] else ""
-        self.assertIn("❓", text)
+        self.assertIn("help", text.lower())
 
     async def test_notes_info_toast(self):
         answer = await self._run_callback("notes_info")
@@ -155,6 +156,7 @@ class TestMenuCallbackRouting(unittest.IsolatedAsyncioTestCase):
         handlers = {
             "cmd_performance": AsyncMock(),
             "cmd_leads": AsyncMock(),
+            "cmd_all_leads": AsyncMock(),
             "cmd_report": AsyncMock(),
             "cmd_ghl": AsyncMock(),
             "cmd_help": AsyncMock(),
@@ -163,6 +165,7 @@ class TestMenuCallbackRouting(unittest.IsolatedAsyncioTestCase):
         }
         with patch("bot.telegram_bot.cmd_performance", handlers["cmd_performance"]), \
              patch("bot.telegram_bot.cmd_leads", handlers["cmd_leads"]), \
+             patch("bot.telegram_bot.cmd_all_leads", handlers["cmd_all_leads"]), \
              patch("bot.telegram_bot.cmd_report", handlers["cmd_report"]), \
              patch("bot.telegram_bot.cmd_ghl", handlers["cmd_ghl"]), \
              patch("bot.telegram_bot.cmd_help", handlers["cmd_help"]), \
