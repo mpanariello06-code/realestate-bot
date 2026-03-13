@@ -103,7 +103,7 @@ class TestMenuCallbackToasts(unittest.IsolatedAsyncioTestCase):
         answer = await self._run_callback("qualify_lead")
         answer.assert_awaited_once()
         text = answer.call_args[0][0] if answer.call_args[0] else ""
-        self.assertIn("🔍", text)
+        self.assertIn("qualify", text.lower())
 
     async def test_ghl_status_toast(self):
         answer = await self._run_callback("ghl_status")
@@ -121,7 +121,7 @@ class TestMenuCallbackToasts(unittest.IsolatedAsyncioTestCase):
         answer = await self._run_callback("help")
         answer.assert_awaited_once()
         text = answer.call_args[0][0] if answer.call_args[0] else ""
-        self.assertIn("❓", text)
+        self.assertIn("help", text.lower())
 
     async def test_notes_info_toast(self):
         answer = await self._run_callback("notes_info")

@@ -151,10 +151,10 @@ def _pipeline_table(total: int, qualified: int, contacted: int, closed: int) -> 
     """Render a sales-pipeline summary as a colour-coded table."""
     rows = [
         ["Stage", "Count", "% of Total"],
-        ["📥 Total Leads",     str(total),     "100%"],
-        ["🎯 Qualified",       str(qualified), _pct(qualified, total)],
-        ["📞 Contacted",       str(contacted), _pct(contacted, total)],
-        ["🏆 Deals Closed",    str(closed),    _pct(closed, total)],
+        ["Total Leads",  str(total),     "100%"],
+        ["Qualified",    str(qualified), _pct(qualified, total)],
+        ["Contacted",    str(contacted), _pct(contacted, total)],
+        ["Deals Closed", str(closed),    _pct(closed, total)],
     ]
     tbl = Table(rows, colWidths=[8 * cm, 4 * cm, 4 * cm])
     stage_colours = [_BRAND_DARK, _BRAND_MID, _AMBER, _GREEN]
@@ -220,7 +220,7 @@ def build_report_pdf(leads: list[dict], perf_records: list[dict]) -> bytes:
     story = []
 
     # Header
-    story.append(Paragraph("🏠 Real Estate Performance Report", st["ReportTitle"]))
+    story.append(Paragraph("Real Estate Performance Report", st["ReportTitle"]))
     story.append(Paragraph(f"Week: {week_start} – {week_end}", st["SubTitle"]))
     story.append(HRFlowable(width="100%", thickness=2, color=_BRAND_MID, spaceAfter=12))
 
@@ -295,13 +295,13 @@ def build_report_pdf(leads: list[dict], perf_records: list[dict]) -> bytes:
     if pending_contact > 0:
         story.append(Paragraph(
             f"You have <b>{pending_contact}</b> qualified lead(s) still waiting to be "
-            "contacted. Follow up now to close more deals! 🚀",
+            "contacted. Follow up now to close more deals!",
             st["Highlight"],
         ))
     else:
         story.append(Paragraph(
             "Great work! All qualified leads have been contacted. "
-            "Keep posting to generate more opportunities. 🏆",
+            "Keep posting to generate more opportunities.",
             st["Highlight"],
         ))
     story.append(Spacer(1, 0.8 * cm))
@@ -367,7 +367,7 @@ def build_leads_pdf(leads: list[dict], title: str, subtitle: str) -> bytes:
     story: list = []
 
     # Header
-    story.append(Paragraph(f"🏠 {title}", st["ReportTitle"]))
+    story.append(Paragraph(title, st["ReportTitle"]))
     story.append(Paragraph(subtitle, st["SubTitle"]))
     story.append(HRFlowable(width="100%", thickness=2, color=_BRAND_MID, spaceAfter=10))
 

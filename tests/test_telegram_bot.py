@@ -213,7 +213,7 @@ class TestFormatQualifyResult(unittest.TestCase):
             "follow_up_questions": ["Budget confirmed?"],
         }
         text = _format_qualify_result(result)
-        self.assertIn("🟢", text)
+        self.assertIn("●", text)
         self.assertIn("80", text)
         self.assertIn("Miami", text)
         self.assertIn("Budget confirmed?", text)
@@ -230,7 +230,7 @@ class TestFormatQualifyResult(unittest.TestCase):
             "follow_up_questions": [],
         }
         text = _format_qualify_result(result)
-        self.assertIn("🟡", text)
+        self.assertIn("◐", text)
 
     def test_not_qualified_shows_red_indicator(self):
         from bot.telegram_bot import _format_qualify_result
@@ -244,7 +244,7 @@ class TestFormatQualifyResult(unittest.TestCase):
             "follow_up_questions": [],
         }
         text = _format_qualify_result(result)
-        self.assertIn("🔴", text)
+        self.assertIn("○", text)
 
     def test_missing_optional_fields_shows_not_mentioned(self):
         from bot.telegram_bot import _format_qualify_result
@@ -276,7 +276,7 @@ class TestCmdNotes(unittest.IsolatedAsyncioTestCase):
         mock_save.assert_called_once_with(3, "Called back viewing Saturday")
         reply_text = update.effective_message.reply_text.call_args[0][0]
         self.assertIn("3", reply_text)
-        self.assertIn("✅", reply_text)
+        self.assertIn("✓", reply_text)
 
     @patch("bot.telegram_bot.sheets.save_lead_notes")
     async def test_notes_failure_shows_error(self, mock_save):
@@ -289,7 +289,7 @@ class TestCmdNotes(unittest.IsolatedAsyncioTestCase):
         await cmd_notes(update, context)
 
         reply_text = update.effective_message.reply_text.call_args[0][0]
-        self.assertIn("❌", reply_text)
+        self.assertIn("✗", reply_text)
 
     async def test_notes_no_args_shows_usage(self):
         from bot.telegram_bot import cmd_notes

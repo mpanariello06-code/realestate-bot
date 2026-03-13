@@ -156,10 +156,10 @@ async def _agent_only(update: Update, context: ContextTypes.DEFAULT_TYPE) -> boo
     if _bot_paused:
         if update.effective_message:
             await update.effective_message.reply_text(
-                f"🔴 *Marcello is Offline*\n"
+                f"○ *Marcello is Offline*\n"
                 f"{_HR}\n\n"
                 "The assistant is currently offline.\n\n"
-                "Tap *▶️ Start Assistant* below to bring Marcello back online.",
+                "Tap *▶ Start Assistant* below to bring Marcello back online.",
                 parse_mode=ParseMode.MARKDOWN,
                 reply_markup=start_bot_keyboard(),
             )
@@ -167,7 +167,7 @@ async def _agent_only(update: Update, context: ContextTypes.DEFAULT_TYPE) -> boo
     if not _is_agent(update):
         if update.effective_message:
             await update.effective_message.reply_text(
-                "⛔ You are not authorised to use this bot.\n\n"
+                "[!] You are not authorised to use this bot.\n\n"
                 "To get access, send /myid to this bot to find your Telegram "
                 "chat ID, then add it to the AGENT_CHAT_IDS line in your .env "
                 "file and restart the bot.",
@@ -294,21 +294,21 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
         if is_admin:
             await update.effective_message.reply_text(
-                "✅ *All set!*\n\n"
+                "✓ *All set!*\n\n"
                 "I'm an Administrator in this group and can see every message. "
-                "I'll reply automatically to anyone who writes a question here. 🏠",
+                "I'll reply automatically to anyone who writes a question here.",
                 parse_mode=ParseMode.MARKDOWN,
                 reply_markup=ForceReply(selective=True),
             )
         else:
             await update.effective_message.reply_text(
-                "⚙️ *Group Setup Needed*\n\n"
+                "*Group Setup Needed*\n\n"
                 "To respond to *every message* in this group (not just "
                 "commands and replies), I need to be made an *Administrator*.\n\n"
                 "Ask a group admin to:\n"
-                "1️⃣ Open *Group Settings → Administrators*\n"
-                "2️⃣ Tap *Add Admin* and select this bot\n"
-                "3️⃣ Enable at least the *\"Manage Group\"* permission\n\n"
+                "1. Open *Group Settings → Administrators*\n"
+                "2. Tap *Add Admin* and select this bot\n"
+                "3. Enable at least the *\"Manage Group\"* permission\n\n"
                 "Once done, type /start again to confirm.\n\n"
                 "_Until then I can only respond to /commands and messages "
                 "that are direct replies to my messages._",
@@ -321,7 +321,7 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not _is_agent(update):
         if update.effective_message:
             await update.effective_message.reply_text(
-                "⛔ You are not authorised to use this bot.\n\n"
+                "[!] You are not authorised to use this bot.\n\n"
                 "To get access, send /myid to this bot to find your Telegram "
                 "chat ID, then add it to the AGENT_CHAT_IDS line in your .env "
                 "file and restart the bot.",
@@ -331,17 +331,17 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     _bot_paused = False
     await _send_with_banner(
         update.effective_message,
-        f"🏠 *Real Estate Agent Assistant*\n"
+        f"*Real Estate Agent Assistant*\n"
         f"{_HR}\n"
-        "Your AI-powered property sales command centre. 🚀\n\n"
-        "▸ 📸 *Post Listing*  — Publish to social media instantly\n"
-        "▸ 🔍 *Qualify Lead*  — AI lead scoring in seconds\n"
-        "▸ 🎯 *Qualified Leads*  — Download qualified leads PDF\n"
-        "▸ 📋 *All Leads*  — Full leads database PDF\n"
-        "▸ 📊 *Performance*  — Today's key metrics\n"
-        "▸ 📈 *Weekly Report*  — Full analysis + downloadable PDF\n\n"
+        "Your AI-powered property sales command centre.\n\n"
+        "▸ *Post Listing*  — Publish to social media instantly\n"
+        "▸ *Qualify Lead*  — AI lead scoring in seconds\n"
+        "▸ *Qualified Leads*  — Download qualified leads PDF\n"
+        "▸ *All Leads*  — Full leads database PDF\n"
+        "▸ *Performance*  — Today's key metrics\n"
+        "▸ *Weekly Report*  — Full analysis + downloadable PDF\n\n"
         f"{_HR}\n"
-        "Tap a button below to get started 👇",
+        "Tap a button below to get started ↓",
         reply_markup=main_menu_keyboard(),
     )
 
@@ -352,27 +352,27 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not await _agent_only(update, context):
         return
     await update.effective_message.reply_text(
-        f"📖 *Commands & Help*\n"
+        f"*Commands & Help*\n"
         f"{_HR}\n\n"
-        "*📸 Listing*\n"
+        "*Listing*\n"
         "`/post`  — Post a new property listing\n\n"
-        "*🔍 Lead Management*\n"
+        "*Lead Management*\n"
         "`/qualify`  — AI-score a prospect enquiry\n"
         "`/leads`    — Download qualified leads PDF\n"
         "`/notes`    — Add a note to a lead\n"
         "  _e.g._ `/notes 3 Viewing Saturday 2pm`\n\n"
-        "*📊 Analytics & Reports*\n"
+        "*Analytics & Reports*\n"
         "`/performance`  — View today's stats\n"
         "`/report`       — Send the weekly report now\n\n"
-        "*⚙️ Integrations*\n"
+        "*Integrations*\n"
         "`/ghl`     — CRM integration status\n"
         "`/zapier`  — Automation status\n\n"
-        "*🔧 Bot Control*\n"
+        "*Bot Control*\n"
         "`/stopbot`   — Take Marcello offline\n"
         "`/startbot`  — Bring Marcello back online\n"
         "`/myid`      — Show your Telegram chat ID\n\n"
         f"{_HR}\n"
-        "💡 _Tap any button below for quick access._",
+        "_Tap any button below for quick access._",
         parse_mode=ParseMode.MARKDOWN,
         reply_markup=main_menu_keyboard(),
     )
@@ -387,12 +387,12 @@ async def cmd_myid(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """
     chat_id = update.effective_chat.id if update.effective_chat else "unknown"
     await update.effective_message.reply_text(
-        f"🪪 *Your Telegram Chat ID is:*\n`{chat_id}`\n\n"
+        f"*Your Telegram Chat ID is:*\n`{chat_id}`\n\n"
         "To authorise yourself as an agent:\n"
-        "1️⃣ Open the `.env` file in the project folder.\n"
-        "2️⃣ Set `AGENT_CHAT_IDS` to this number:\n"
+        "1. Open the `.env` file in the project folder.\n"
+        "2. Set `AGENT_CHAT_IDS` to this number:\n"
         f"   `AGENT_CHAT_IDS={chat_id}`\n"
-        "3️⃣ Save the file and restart the bot with `python main.py`.\n\n"
+        "3. Save the file and restart the bot with `python main.py`.\n\n"
         "To add multiple agents, separate each ID with a comma:\n"
         "   `AGENT_CHAT_IDS=111111111,222222222`",
         parse_mode=ParseMode.MARKDOWN,
@@ -407,11 +407,11 @@ def _format_qualify_result(result: dict) -> str:
     score = result.get("score", 0)
     threshold = config.LEAD_QUALIFICATION_THRESHOLD
     if score >= threshold:
-        indicator = "🟢 Qualified"
+        indicator = "● Qualified"
     elif score >= threshold // 2:
-        indicator = "🟡 Borderline"
+        indicator = "◐ Borderline"
     else:
-        indicator = "🔴 Not Qualified"
+        indicator = "○ Not Qualified"
 
     intent = result.get("intent", "unknown").title()
     budget = result.get("budget") or "Not mentioned"
@@ -421,16 +421,16 @@ def _format_qualify_result(result: dict) -> str:
     questions = result.get("follow_up_questions", [])
 
     lines = [
-        "*🔍 Lead Qualification Result*\n",
+        "*Lead Qualification Result*\n",
         f"Score: *{score}/100* {indicator}",
         f"Intent: *{intent}*",
         f"Budget: {budget}",
         f"Timeline: {timeline}",
         f"Location: {location}",
-        f"\n*📝 Summary:*\n{summary}",
+        f"\n*Summary:*\n{summary}",
     ]
     if questions:
-        lines.append("\n*❓ Suggested Follow-up Questions:*")
+        lines.append("\n*Suggested Follow-up Questions:*")
         for i, q in enumerate(questions, 1):
             lines.append(f"{i}. {q}")
     lines.append("\nSave this lead to your sheet?")
@@ -456,9 +456,9 @@ async def cmd_qualify(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     total = len(all_leads)
 
     await update.effective_message.reply_text(
-        f"🤖 *AI Lead Qualification Engine*\n"
+        f"*AI Lead Qualification Engine*\n"
         f"{_HR}\n"
-        f"⏳ Scanning *{total}* lead(s) in the database…\n"
+        f"Scanning *{total}* lead(s) in the database…\n"
         f"_Analysing intent, budget, timeline & fit…_",
         parse_mode=ParseMode.MARKDOWN,
     )
@@ -471,11 +471,11 @@ async def cmd_qualify(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     n_qualified = len(qualified)
 
     await update.effective_message.reply_text(
-        f"✅ *Scan Complete*\n"
+        f"✓ *Scan Complete*\n"
         f"{_HR}\n\n"
-        f"📊 Leads analysed:   *{total}*\n"
-        f"🎯 Leads qualified:  *{n_qualified}*\n"
-        f"📁 Database updated\n\n"
+        f"Leads analysed:   *{total}*\n"
+        f"Leads qualified:  *{n_qualified}*\n"
+        f"Database updated\n\n"
         f"_{_HR2}_\n"
         f"_Threshold: {threshold}/100_",
         parse_mode=ParseMode.MARKDOWN,
@@ -483,8 +483,8 @@ async def cmd_qualify(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
 
     if not qualified:
         await update.effective_message.reply_text(
-            "📭 No leads currently meet the qualification threshold.\n"
-            "Keep collecting enquiries — they will be scored automatically. 🚀",
+            "No leads currently meet the qualification threshold.\n"
+            "Keep collecting enquiries — they will be scored automatically.",
             reply_markup=main_menu_keyboard(),
         )
         return
@@ -503,33 +503,33 @@ async def cmd_qualify(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         status   = (lead.get("status") or "new").title()
 
         if score >= 85:
-            badge = "🟢 High Priority"
+            badge = "● High Priority"
         elif score >= threshold:
-            badge = "🟡 Qualified"
+            badge = "◐ Qualified"
         else:
-            badge = "🟡 Borderline"
+            badge = "◐ Borderline"
 
         await update.effective_message.reply_text(
-            f"🎯 *Qualified Lead #{i}*  —  {badge}\n"
+            f"*Qualified Lead #{i}*  —  {badge}\n"
             f"{_HR}\n"
-            f"👤  *{name}*\n"
-            f"📞  {phone}\n"
-            f"📧  {email}\n"
+            f"*{name}*\n"
+            f"Tel:      {phone}\n"
+            f"Email:    {email}\n"
             f"{_HR2}\n"
-            f"🏠  Intent:    *{intent}*\n"
-            f"📍  Location:  {location}\n"
-            f"💰  Budget:    {budget}\n"
-            f"⏰  Timeline:  {timeline}\n"
+            f"Intent:   *{intent}*\n"
+            f"Location: {location}\n"
+            f"Budget:   {budget}\n"
+            f"Timeline: {timeline}\n"
             f"{_HR2}\n"
-            f"⭐  Score:  *{score}/100*\n"
-            f"📌  Status: {status}\n\n"
-            f"📝 _{summary}_",
+            f"Score:    *{score}/100*\n"
+            f"Status:   {status}\n\n"
+            f"_{summary}_",
             parse_mode=ParseMode.MARKDOWN,
         )
 
     await update.effective_message.reply_text(
-        f"✅ *{n_qualified} qualified lead(s) identified.*\n\n"
-        "Tap *Qualified Leads* to download the full report as a PDF. 👇",
+        f"✓ *{n_qualified} qualified lead(s) identified.*\n\n"
+        "Tap *Qualified Leads* to download the full report as a PDF. ↓",
         parse_mode=ParseMode.MARKDOWN,
         reply_markup=main_menu_keyboard(),
     )
@@ -540,7 +540,7 @@ async def _cmd_qualify_manual(update: Update, context: ContextTypes.DEFAULT_TYPE
     if not await _agent_only(update, context):
         return ConversationHandler.END
     await update.effective_message.reply_text(
-        "📋 *Qualify a Lead*\n\n"
+        "*Qualify a Lead*\n\n"
         "Paste the enquiry message from the prospect (WhatsApp, DM, email, etc.) "
         "and I'll score it instantly.",
         parse_mode=ParseMode.MARKDOWN,
@@ -552,7 +552,7 @@ async def _cmd_qualify_manual(update: Update, context: ContextTypes.DEFAULT_TYPE
 async def handle_qualify_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Receive the prospect's message, run AI qualification, show results."""
     message_text = update.effective_message.text or ""
-    await update.effective_message.reply_text("🤖 Analysing lead…")
+    await update.effective_message.reply_text("Analysing lead…")
 
     result = lead_qualifier.qualify_lead(message_text)
     result["message"] = message_text
@@ -573,22 +573,22 @@ async def handle_qualify_save_callback(
     query = update.callback_query
 
     if query.data == "qualify_discard":
-        await query.answer("🗑 Discarded")
+        await query.answer("Discarded")
         context.user_data.pop(CTX_QUALIFY_RESULT, None)
-        await _safe_edit(query, "🗑 Lead discarded.")
+        await _safe_edit(query, "Lead discarded.")
         return ConversationHandler.END
 
     if query.data == "qualify_save":
-        await query.answer("💾 Saving…")
+        await query.answer("Saving…")
         result = context.user_data.pop(CTX_QUALIFY_RESULT, {})
         result.setdefault("platform", "telegram")
         saved = sheets.save_lead(result)
         if saved:
-            await _safe_edit(query, "✅ Lead saved to your Google Sheet!")
+            await _safe_edit(query, "✓ Lead saved to your Google Sheet!")
         else:
             await _safe_edit(
                 query,
-                "❌ Could not save lead – check your Google Sheets connection."
+                "✗ Could not save lead – check your Google Sheets connection."
             )
         return ConversationHandler.END
 
@@ -620,11 +620,11 @@ async def cmd_notes(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     success = sheets.save_lead_notes(lead_num, note_text)
     if success:
         await update.effective_message.reply_text(
-            f"✅ Notes saved for lead #{lead_num}."
+            f"✓ Notes saved for lead #{lead_num}."
         )
     else:
         await update.effective_message.reply_text(
-            f"❌ Could not save notes for lead #{lead_num}. "
+            f"✗ Could not save notes for lead #{lead_num}. "
             "Check the lead number and your Google Sheets connection."
         )
 
@@ -637,9 +637,9 @@ async def cmd_leads(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         return
 
     await update.effective_message.reply_text(
-        f"🎯 *Generating Qualified Leads Report*\n"
+        f"*Generating Qualified Leads Report*\n"
         f"{_HR}\n"
-        "⏳ Building your PDF — this will only take a moment…",
+        "Building your PDF — this will only take a moment…",
         parse_mode=ParseMode.MARKDOWN,
     )
 
@@ -650,7 +650,7 @@ async def cmd_leads(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
     if not leads:
         await update.effective_message.reply_text(
-            "📭 No qualified leads yet.\nKeep posting — they're on their way! 🚀",
+            "No qualified leads yet.\nKeep posting — they're on their way!",
             reply_markup=main_menu_keyboard(),
         )
         return
@@ -667,9 +667,9 @@ async def cmd_leads(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         document=io.BytesIO(pdf_bytes),
         filename=filename,
         caption=(
-            f"🎯 *Qualified Leads Report*\n"
-            f"📊 {len(leads)} qualified lead(s) · {today.strftime('%d %b %Y')}\n\n"
-            "Tap to open or forward to your team. 👆"
+            f"*Qualified Leads Report*\n"
+            f"{len(leads)} qualified lead(s)  ·  {today.strftime('%d %b %Y')}\n\n"
+            "Tap to open or forward to your team."
         ),
         parse_mode=ParseMode.MARKDOWN,
         reply_markup=main_menu_keyboard(),
@@ -705,13 +705,13 @@ def _format_lead_text(i: int, lead: dict) -> str:
     status = lead.get("status", "new").title()
     return (
         f"*Lead #{i}*\n"
-        f"👤 {name}\n"
-        f"📧 {email}\n"
-        f"📞 {phone}\n"
-        f"🏠 Intent: {intent}\n"
-        f"⭐ Score: {score}/100\n"
-        f"📝 {summary}\n"
-        f"📌 Status: {status}"
+        f"{name}\n"
+        f"Email:  {email}\n"
+        f"Tel:    {phone}\n"
+        f"Intent: {intent}\n"
+        f"Score:  {score}/100\n"
+        f"{summary}\n"
+        f"Status: {status}"
     )
 
 
@@ -721,9 +721,9 @@ async def cmd_all_leads(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         return
 
     await update.effective_message.reply_text(
-        f"📋 *Generating All Leads Report*\n"
+        f"*Generating All Leads Report*\n"
         f"{_HR}\n"
-        "⏳ Building your PDF — this will only take a moment…",
+        "Building your PDF — this will only take a moment…",
         parse_mode=ParseMode.MARKDOWN,
     )
 
@@ -756,10 +756,10 @@ async def cmd_all_leads(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         document=io.BytesIO(pdf_bytes),
         filename=filename,
         caption=(
-            f"📋 *All Leads Report*\n"
-            f"📊 {total} leads  ·  ✅ {n_qual} qualified  ·  ⏳ {n_unqual} unqualified\n"
-            f"📅 {today.strftime('%d %b %Y')}\n\n"
-            "Tap to open or forward to your team. 👆"
+            f"*All Leads Report*\n"
+            f"{total} leads  ·  {n_qual} qualified  ·  {n_unqual} unqualified\n"
+            f"{today.strftime('%d %b %Y')}\n\n"
+            "Tap to open or forward to your team."
         ),
         parse_mode=ParseMode.MARKDOWN,
         reply_markup=main_menu_keyboard(),
@@ -768,11 +768,11 @@ async def cmd_all_leads(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 
 # ── /performance ──────────────────────────────────────────────────────────────
 
-def _platform_stats_line(icon: str, name: str, followers: int, engagement: float) -> str:
+def _platform_stats_line(name: str, followers: int, engagement: float) -> str:
     """Format a single social-media platform stats block for the performance message."""
     return (
-        f"  {icon} {name}\n"
-        f"     👥 *{followers:,}* followers  ·  💡 *{engagement}%* engagement\n"
+        f"  {name}\n"
+        f"     *{followers:,}* followers  ·  *{engagement}%* engagement\n"
     )
 
 
@@ -786,29 +786,29 @@ async def cmd_performance(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     p = DEMO_PERFORMANCE_TODAY
 
     social_lines = (
-        _platform_stats_line("📷", "Instagram", p["instagram_followers"], p["instagram_engagement"])
-        + _platform_stats_line("📘", "Facebook", p["facebook_followers"], p["facebook_engagement"])
+        _platform_stats_line("Instagram", p["instagram_followers"], p["instagram_engagement"])
+        + _platform_stats_line("Facebook", p["facebook_followers"], p["facebook_engagement"])
     )
 
     await update.effective_message.reply_text(
-        f"📊 *Performance Dashboard*\n"
+        f"*Performance Dashboard*\n"
         f"{_HR}\n"
-        f"📅 {today_label}\n\n"
-        f"🏠 *Lead Activity*\n"
+        f"{today_label}\n\n"
+        f"*Lead Activity*\n"
         f"  New leads:       *{p['new_leads']}*\n"
         f"  Qualified:       *{p['qualified_leads']}*\n"
-        f"  Response rate:   *{p['response_rate_pct']}%* ✅\n"
-        f"  Avg response:    *{p['avg_response_min']} min* ⚡\n\n"
+        f"  Response rate:   *{p['response_rate_pct']}%*\n"
+        f"  Avg response:    *{p['avg_response_min']} min*\n\n"
         f"{_HR2}\n"
-        f"💬 *Messaging*\n"
+        f"*Messaging*\n"
         f"  Messages handled: *{p['messages_handled']}* today\n\n"
         f"{_HR2}\n"
-        f"📱 *Social Media*\n"
+        f"*Social Media*\n"
         + social_lines
-        + f"\n  🖼 Posts today: *{p['posts_today']}*"
-        f"  ·  👁 Views: *{p['views_today']:,}*\n\n"
+        + f"\n  Posts today: *{p['posts_today']}*"
+        f"  ·  Views: *{p['views_today']:,}*\n\n"
         f"{_HR}\n"
-        f"💡 _Tap Weekly Report for the full analysis PDF._",
+        f"_Tap Weekly Report for the full analysis PDF._",
         parse_mode=ParseMode.MARKDOWN,
         reply_markup=main_menu_keyboard(),
     )
@@ -820,9 +820,9 @@ async def cmd_report(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     if not await _agent_only(update, context):
         return
     await update.effective_message.reply_text(
-        f"📈 *Generating Weekly Report*\n"
+        f"*Generating Weekly Report*\n"
         f"{_HR}\n"
-        "⏳ Compiling metrics and building your PDF…\n"
+        "Compiling metrics and building your PDF…\n"
         "_This will only take a moment._",
         parse_mode=ParseMode.MARKDOWN,
     )
@@ -839,11 +839,11 @@ async def cmd_ghl(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         return
 
     configured = ghl_service.is_configured()
-    auto_reply_status = "✅ Enabled" if config.GHL_AUTO_REPLY_ENABLED else "❌ Disabled"
-    api_status = "✅ Credentials set" if configured else "❌ Not configured"
+    auto_reply_status = "Enabled" if config.GHL_AUTO_REPLY_ENABLED else "Disabled"
+    api_status = "Configured" if configured else "Not configured"
 
     lines = [
-        "*🔗 Go High Level Integration*\n",
+        "*Go High Level Integration*\n",
         f"API Status: {api_status}",
         f"Auto-DM Reply: {auto_reply_status}",
     ]
@@ -862,14 +862,14 @@ async def cmd_ghl(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     else:
         lines.append(
             "\n*Setup Steps:*\n"
-            "1️⃣ Add these to your `.env` file:\n"
+            "1. Add these to your `.env` file:\n"
             "   `GHL_API_KEY=<your private integration key>`\n"
             "   `GHL_LOCATION_ID=<your sub-account location ID>`\n\n"
-            "2️⃣ In GHL → Settings → Webhooks, add:\n"
+            "2. In GHL → Settings → Webhooks, add:\n"
             "   URL: `<your-server>/webhook/ghl`\n"
             "   Event: `InboundMessage`\n\n"
-            "3️⃣ Restart the bot and run `/ghl` again to confirm.\n\n"
-            "4️⃣ Optional: customise the auto-reply with:\n"
+            "3. Restart the bot and run `/ghl` again to confirm.\n\n"
+            "4. Optional: customise the auto-reply with:\n"
             "   `GHL_AUTO_REPLY_MESSAGE=Hi {first_name}! ...`"
         )
 
@@ -889,27 +889,27 @@ async def cmd_zapier(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         return
 
     configured = zapier_service.is_configured()
-    status = "✅ Connected" if configured else "❌ Not connected"
+    status = "Connected" if configured else "Not connected"
 
     lines = [
-        "*⚙️ Integration Status*\n",
+        "*Integration Status*\n",
         f"Social Media Automation: {status}",
     ]
 
     if configured:
         cloudinary_ok = cloudinary_upload.is_configured()
-        image_status = "✅ Image hosting configured" if cloudinary_ok else "⚠️ Image hosting not set up (posts will have no image)"
+        image_status = "Configured" if cloudinary_ok else "Not configured (posts will have no image)"
         lines.append(f"Image Hosting: {image_status}")
         lines.append(
             "\n*How it works:*\n"
             "When you tap *Post Listing*, the bot:\n"
-            "1️⃣ Collects listing details (price, location, bedrooms, bathrooms, phone)\n"
-            "2️⃣ Uploads the photo to get a public URL\n"
-            "3️⃣ Publishes to Facebook & Instagram automatically."
+            "1. Collects listing details (price, location, bedrooms, bathrooms, phone)\n"
+            "2. Uploads the photo to get a public URL\n"
+            "3. Publishes to Facebook & Instagram automatically."
         )
     else:
         lines.append(
-            "\n⚠️ Social media automation is not configured.\n"
+            "\nSocial media automation is not configured.\n"
             "Please contact your administrator to set up the integration."
         )
 
@@ -932,7 +932,7 @@ async def cmd_post(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     else:
         channel_note = "You will choose the target platform after confirming the caption."
     await update.effective_message.reply_text(
-        f"📸 *New Listing Post*\n"
+        f"*New Listing Post*\n"
         f"{_HR}\n"
         f"_Step 1 of 6 — Media_\n\n"
         "Please send me a *photo or video* of the property, "
@@ -975,7 +975,7 @@ async def handle_media(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
     context.user_data[CTX_MEDIA_TYPE] = media_type
 
     await msg.reply_text(
-        "✅ *Media received!*\n\n"
+        "✓ *Media received!*\n\n"
         "_Step 2 of 6 — Description_\n\n"
         "Now send me a *short description* of the property.\n"
         "_e.g. 3-bed house in Miami, $450k, pool, renovated kitchen_",
@@ -990,17 +990,17 @@ async def handle_description(update: Update, context: ContextTypes.DEFAULT_TYPE)
     description = update.effective_message.text or ""
     context.user_data[CTX_DESCRIPTION] = description
 
-    await update.effective_message.reply_text("✍️ Generating an AI caption for you…")
+    await update.effective_message.reply_text("Generating an AI caption for you…")
     caption = lead_qualifier.generate_listing_caption(description)
     context.user_data[CTX_CAPTION] = caption
 
     # When Zapier is configured, collect structured listing fields before posting
     if zapier_service.is_configured():
         await update.effective_message.reply_text(
-            f"*📝 Generated Caption:*\n\n{caption}\n\n"
+            f"*Generated Caption:*\n\n{caption}\n\n"
             f"{_HR2}\n"
             "_Step 3 of 6 — Price_\n\n"
-            "💰 What is the *asking price*?\n"
+            "What is the *asking price*?\n"
             "_e.g. $650,000 or 650k_",
             parse_mode=ParseMode.MARKDOWN,
             reply_markup=ForceReply(selective=True),
@@ -1008,7 +1008,7 @@ async def handle_description(update: Update, context: ContextTypes.DEFAULT_TYPE)
         return AWAITING_PRICE
 
     await update.effective_message.reply_text(
-        f"*📝 Generated Caption:*\n\n{caption}\n\n"
+        f"*Generated Caption:*\n\n{caption}\n\n"
         "Choose an option:",
         parse_mode=ParseMode.MARKDOWN,
         reply_markup=confirm_post_keyboard(),
@@ -1021,7 +1021,7 @@ async def handle_price(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
     context.user_data[CTX_PRICE] = update.effective_message.text or ""
     await update.effective_message.reply_text(
         "_Step 4 of 6 — Location_\n\n"
-        "📍 What is the *location / city*?\n"
+        "What is the *location / city*?\n"
         "_e.g. Ottawa, ON_",
         parse_mode=ParseMode.MARKDOWN,
         reply_markup=ForceReply(selective=True),
@@ -1034,7 +1034,7 @@ async def handle_location(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     context.user_data[CTX_LOCATION] = update.effective_message.text or ""
     await update.effective_message.reply_text(
         "_Step 5 of 6 — Bedrooms & Bathrooms_\n\n"
-        "🛏 How many *bedrooms*?\n"
+        "How many *bedrooms*?\n"
         "_e.g. 3_",
         parse_mode=ParseMode.MARKDOWN,
         reply_markup=ForceReply(selective=True),
@@ -1046,7 +1046,7 @@ async def handle_bedrooms(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     """Receive the bedroom count and ask for bathroom count."""
     context.user_data[CTX_BEDROOMS] = update.effective_message.text or ""
     await update.effective_message.reply_text(
-        "🚿 How many *bathrooms*?\n"
+        "How many *bathrooms*?\n"
         "_e.g. 2_",
         parse_mode=ParseMode.MARKDOWN,
         reply_markup=ForceReply(selective=True),
@@ -1059,7 +1059,7 @@ async def handle_bathrooms(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     context.user_data[CTX_BATHROOMS] = update.effective_message.text or ""
     await update.effective_message.reply_text(
         "_Step 6 of 6 — Contact_\n\n"
-        "📞 What is the *contact phone number*?\n"
+        "What is the *contact phone number*?\n"
         "_e.g. 613-555-1234_",
         parse_mode=ParseMode.MARKDOWN,
         reply_markup=ForceReply(selective=True),
@@ -1073,15 +1073,15 @@ async def handle_contact_phone(update: Update, context: ContextTypes.DEFAULT_TYP
     caption = context.user_data.get(CTX_CAPTION, "")
 
     summary = (
-        f"*📋 Listing Summary*\n"
+        f"*Listing Summary*\n"
         f"{_HR}\n\n"
-        f"📝 *Caption:*\n_{caption}_\n\n"
+        f"*Caption:*\n_{caption}_\n\n"
         f"{_HR2}\n"
-        f"💰 *Price:*     {context.user_data.get(CTX_PRICE, '—')}\n"
-        f"📍 *Location:* {context.user_data.get(CTX_LOCATION, '—')}\n"
-        f"🛏 *Beds:*      {context.user_data.get(CTX_BEDROOMS, '—')}\n"
-        f"🚿 *Baths:*     {context.user_data.get(CTX_BATHROOMS, '—')}\n"
-        f"📞 *Phone:*    {context.user_data.get(CTX_CONTACT_PHONE, '—')}\n\n"
+        f"*Price:*     {context.user_data.get(CTX_PRICE, '—')}\n"
+        f"*Location:* {context.user_data.get(CTX_LOCATION, '—')}\n"
+        f"*Beds:*      {context.user_data.get(CTX_BEDROOMS, '—')}\n"
+        f"*Baths:*     {context.user_data.get(CTX_BATHROOMS, '—')}\n"
+        f"*Phone:*    {context.user_data.get(CTX_CONTACT_PHONE, '—')}\n\n"
         f"{_HR}\n"
         "Ready to publish to Facebook, Instagram & LinkedIn:"
     )
@@ -1097,7 +1097,7 @@ async def handle_caption_edit(update: Update, context: ContextTypes.DEFAULT_TYPE
     """Receive the manually edited caption."""
     context.user_data[CTX_CAPTION] = update.effective_message.text or ""
     await update.effective_message.reply_text(
-        "✅ Caption updated! Now select the platform:",
+        "✓ Caption updated! Now select the platform:",
         reply_markup=posting_platform_keyboard(),
     )
     return AWAITING_PLATFORM
@@ -1107,21 +1107,21 @@ async def handle_confirm_callback(update: Update, context: ContextTypes.DEFAULT_
     query = update.callback_query
 
     if query.data == "cancel":
-        await query.answer("❌ Cancelled")
+        await query.answer("Cancelled")
         _cleanup_media(context)
-        await _safe_edit(query, "❌ Post cancelled.")
+        await _safe_edit(query, "Post cancelled.")
         return ConversationHandler.END
 
     if query.data == "edit_caption":
-        await query.answer("✏️ Edit mode")
-        await _safe_edit(query, "✏️ Please type your new caption:")
+        await query.answer("Edit mode")
+        await _safe_edit(query, "Please type your new caption:")
         return AWAITING_CAPTION_EDIT
 
     if query.data == "confirm_post":
         # ── Zapier path (preferred) ───────────────────────────────────────────
         if zapier_service.is_configured():
-            await query.answer("🚀 Publishing listing…")
-            await _safe_edit(query, "🚀 Uploading photo and publishing your listing…")
+            await query.answer("Publishing listing…")
+            await _safe_edit(query, "Uploading photo and publishing your listing…")
 
             image_path = context.user_data.get(CTX_MEDIA_PATH)
             media_type = context.user_data.get(CTX_MEDIA_TYPE, "photo")
@@ -1136,7 +1136,7 @@ async def handle_confirm_callback(update: Update, context: ContextTypes.DEFAULT_
                     await context.bot.send_message(
                         chat_id=update.effective_chat.id,
                         text=(
-                            "⚠️ Image hosting is not configured — the post will be "
+                            "[!] Image hosting is not configured — the post will be "
                             "published without an image. Instagram posts require an image; "
                             "please contact your administrator to enable image hosting."
                         ),
@@ -1146,7 +1146,7 @@ async def handle_confirm_callback(update: Update, context: ContextTypes.DEFAULT_
                     await context.bot.send_message(
                         chat_id=update.effective_chat.id,
                         text=(
-                            "⚠️ Photo upload failed. Publishing without image. "
+                            "[!] Photo upload failed. Publishing without image. "
                             "Instagram posting will be skipped."
                         ),
                     )
@@ -1171,13 +1171,13 @@ async def handle_confirm_callback(update: Update, context: ContextTypes.DEFAULT_
 
             res = zapier_service.post_listing(listing)
             if res.get("success"):
-                url_line = f"\n🔗 Image URL: {image_url}" if image_url else ""
+                url_line = f"\nURL: {image_url}" if image_url else ""
                 result_text = (
-                    "✅ Post sent successfully! Your listing will be published to Facebook, Instagram & LinkedIn."
+                    "✓ Post sent successfully! Your listing will be published to Facebook, Instagram & LinkedIn."
                     + url_line
                 )
             else:
-                result_text = f"❌ Could not publish listing: {res.get('error', 'Unknown error')}"
+                result_text = f"✗ Could not publish listing: {res.get('error', 'Unknown error')}"
             _cleanup_media(context)
             await context.bot.send_message(
                 chat_id=update.effective_chat.id,
@@ -1189,20 +1189,20 @@ async def handle_confirm_callback(update: Update, context: ContextTypes.DEFAULT_
 
         # ── GHL path ─────────────────────────────────────────────────────────
         if ghl_service.is_configured():
-            await query.answer("🚀 Posting via GHL Social Planner…")
+            await query.answer("Posting via GHL Social Planner…")
             caption = context.user_data.get(CTX_CAPTION, "")
             image_path = context.user_data.get(CTX_MEDIA_PATH)
             media_type = context.user_data.get(CTX_MEDIA_TYPE, "photo")
-            await _safe_edit(query, "🚀 Posting via GHL Social Planner…")
+            await _safe_edit(query, "Posting via GHL Social Planner…")
             res = ghl_service.post_to_social_planner(
                 caption,
                 image_path if media_type == "photo" else None,
             )
             if res.get("success"):
                 post_id = res.get("post_id", "—")
-                result_text = f"✅ GHL: Post published! (id: {post_id})"
+                result_text = f"✓ GHL: Post published (id: {post_id})"
             else:
-                result_text = f"❌ GHL: {res.get('error', 'Unknown error')}"
+                result_text = f"✗ GHL: {res.get('error', 'Unknown error')}"
             _cleanup_media(context)
             await context.bot.send_message(
                 chat_id=update.effective_chat.id,
@@ -1213,10 +1213,10 @@ async def handle_confirm_callback(update: Update, context: ContextTypes.DEFAULT_
             return ConversationHandler.END
 
         # ── Fallback: let agent choose platform (direct API) ──────────────────
-        await query.answer("📱 Choosing platform…")
+        await query.answer("Choosing platform…")
         await _safe_edit(
             query,
-            "📱 Select which platform(s) to post to:",
+            "Select which platform(s) to post to:",
             reply_markup=posting_platform_keyboard(),
         )
         return AWAITING_PLATFORM
@@ -1229,20 +1229,20 @@ async def handle_platform_callback(update: Update, context: ContextTypes.DEFAULT
     query = update.callback_query
 
     if query.data == "cancel":
-        await query.answer("❌ Cancelled")
+        await query.answer("Cancelled")
         _cleanup_media(context)
-        await _safe_edit(query, "❌ Post cancelled.")
+        await _safe_edit(query, "Post cancelled.")
         return ConversationHandler.END
 
     platform = query.data.replace("platform_", "")
-    await query.answer(f"🚀 Posting to {platform.title()}…")
+    await query.answer(f"Posting to {platform.title()}…")
     context.user_data[CTX_PLATFORM] = platform
 
     caption = context.user_data.get(CTX_CAPTION, "")
     image_path = context.user_data.get(CTX_MEDIA_PATH)
     media_type = context.user_data.get(CTX_MEDIA_TYPE, "photo")
 
-    await _safe_edit(query, f"🚀 Posting to {platform.title()}…")
+    await _safe_edit(query, f"Posting to {platform.title()}…")
 
     if platform == "all":
         results = social_poster.post_listing(
@@ -1252,13 +1252,13 @@ async def handle_platform_callback(update: Update, context: ContextTypes.DEFAULT
         )
         lines = []
         for plat, res in results.items():
-            icon = "✅" if res.get("success") else "❌"
+            icon = "✓" if res.get("success") else "✗"
             post_id = res.get("post_id") or ""
             if res.get("success") and post_id:
                 if plat == "facebook":
                     lines.append(
                         f"{icon} {plat.title()}: {post_id}\n"
-                        f"🔗 https://www.facebook.com/{post_id}"
+                        f"https://www.facebook.com/{post_id}"
                     )
                 else:
                     lines.append(f"{icon} {plat.title()}: {post_id}")
@@ -1271,19 +1271,19 @@ async def handle_platform_callback(update: Update, context: ContextTypes.DEFAULT
         )
         if res.get("success"):
             post_id = res.get("post_id", "")
-            url_line = f"\n🔗 https://www.facebook.com/{post_id}" if post_id else ""
-            result_text = f"✅ Facebook: {post_id}{url_line}"
+            url_line = f"\nhttps://www.facebook.com/{post_id}" if post_id else ""
+            result_text = f"✓ Facebook: {post_id}{url_line}"
         else:
-            result_text = f"❌ Facebook: {res.get('error', '')}"
+            result_text = f"✗ Facebook: {res.get('error', '')}"
     elif platform == "instagram":
         res = social_poster.post_to_instagram(caption, image_path or "")
         if res.get("success"):
             post_id = res.get("post_id", "")
-            result_text = f"✅ Instagram: {post_id}"
+            result_text = f"✓ Instagram: {post_id}"
         else:
-            result_text = f"❌ Instagram: {res.get('error', '')}"
+            result_text = f"✗ Instagram: {res.get('error', '')}"
     else:
-        result_text = "❌ Unknown platform or missing media."
+        result_text = "✗ Unknown platform or missing media."
 
     _cleanup_media(context)
     await context.bot.send_message(
@@ -1322,12 +1322,12 @@ async def handle_lead_action(update: Update, context: ContextTypes.DEFAULT_TYPE)
     index = int(parts[2])        # 0-based display index
     status_map = {"contacted": "contacted", "closed": "closed", "lost": "lost"}
     status = status_map.get(action, "new")
-    await query.answer(f"✅ Marked as {status.title()}")
+    await query.answer(f"Marked as {status.title()}")
     sheets.update_lead_status(index + 1, status)
     await query.edit_message_reply_markup(reply_markup=None)
     await context.bot.send_message(
         chat_id=update.effective_chat.id,
-        text=f"✅ Lead #{index + 1} marked as *{status.title()}*.",
+        text=f"✓ Lead #{index + 1} marked as *{status.title()}*.",
         parse_mode=ParseMode.MARKDOWN,
     )
 
@@ -1341,10 +1341,10 @@ async def cmd_stop_bot(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         return
     _bot_paused = True
     await update.effective_message.reply_text(
-        f"🔴 *Marcello is Offline*\n"
+        f"○ *Marcello is Offline*\n"
         f"{_HR}\n\n"
         "The assistant is now offline. All bot functions are disabled.\n\n"
-        "Tap *▶️ Start Assistant* below to bring Marcello back online.",
+        "Tap *▶ Start Assistant* below to bring Marcello back online.",
         parse_mode=ParseMode.MARKDOWN,
         reply_markup=start_bot_keyboard(),
     )
@@ -1357,10 +1357,10 @@ async def cmd_start_bot(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         return
     _bot_paused = False
     await update.effective_message.reply_text(
-        f"✅ *Marcello is Online*\n"
+        f"● *Marcello is Online*\n"
         f"{_HR}\n\n"
         "All functions are active.\n\n"
-        "Tap a button below to get started 👇",
+        "Tap a button below to get started ↓",
         parse_mode=ParseMode.MARKDOWN,
         reply_markup=main_menu_keyboard(),
     )
@@ -1370,18 +1370,18 @@ async def cmd_start_bot(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 
 # Toast messages shown instantly when a menu button is tapped
 _MENU_TOASTS: dict[str, str] = {
-    "post_listing":    "📸 Starting post flow…",
-    "qualify_lead":    "🔍 Opening qualify flow…",
-    "qualified_leads": "🎯 Loading qualified leads…",
-    "all_leads":       "📋 Loading all leads…",
-    "performance":     "📊 Loading performance…",
-    "weekly_report":   "📈 Generating report…",
-    "zapier_status":   "⚙️ Loading integrations…",
-    "ghl_status":      "🔗 Loading GHL status…",
-    "notes_info":      "📝 Opening notes guide…",
-    "help":            "❓ Loading help…",
-    "stop_bot":        "⏹ Taking Marcello offline…",
-    "start_bot":       "▶️ Starting Assistant…",
+    "post_listing":    "Starting post flow…",
+    "qualify_lead":    "Opening qualify flow…",
+    "qualified_leads": "Loading qualified leads…",
+    "all_leads":       "Loading all leads…",
+    "performance":     "Loading performance…",
+    "weekly_report":   "Generating report…",
+    "zapier_status":   "Loading integrations…",
+    "ghl_status":      "Loading GHL status…",
+    "notes_info":      "Opening notes guide…",
+    "help":            "Loading help…",
+    "stop_bot":        "■ Taking Marcello offline…",
+    "start_bot":       "▶ Starting Assistant…",
 }
 
 
@@ -1393,13 +1393,13 @@ async def handle_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYP
     if query.data == "start_bot":
         if _is_agent(update):
             _bot_paused = False
-            await query.answer("▶️ Assistant started!")
+            await query.answer("▶ Assistant started!")
             await _safe_edit(
                 query,
-                f"✅ *Marcello is Online*\n"
+                f"● *Marcello is Online*\n"
                 f"{_HR}\n\n"
                 "All functions are active.\n\n"
-                "Tap a button below to get started 👇",
+                "Tap a button below to get started ↓",
                 parse_mode=ParseMode.MARKDOWN,
                 reply_markup=main_menu_keyboard(),
             )
@@ -1411,13 +1411,13 @@ async def handle_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYP
     if query.data == "stop_bot":
         if _is_agent(update):
             _bot_paused = True
-            await query.answer("⏹ Marcello offline")
+            await query.answer("■ Marcello offline")
             await _safe_edit(
                 query,
-                f"🔴 *Marcello is Offline*\n"
+                f"○ *Marcello is Offline*\n"
                 f"{_HR}\n\n"
                 "The assistant is now offline. All bot functions are disabled.\n\n"
-                "Tap *▶️ Start Assistant* below to bring Marcello back online.",
+                "Tap *▶ Start Assistant* below to bring Marcello back online.",
                 parse_mode=ParseMode.MARKDOWN,
                 reply_markup=start_bot_keyboard(),
             )
@@ -1427,12 +1427,12 @@ async def handle_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYP
 
     # ── All other callbacks: blocked when assistant is offline ────────────
     if _bot_paused:
-        await query.answer("🔴 Marcello is offline")
+        await query.answer("○ Marcello is offline")
         await _safe_edit(
             query,
-            f"🔴 *Marcello is Offline*\n"
+            f"○ *Marcello is Offline*\n"
             f"{_HR}\n\n"
-            "Tap *▶️ Start Assistant* below to bring Marcello back online.",
+            "Tap *▶ Start Assistant* below to bring Marcello back online.",
             parse_mode=ParseMode.MARKDOWN,
             reply_markup=start_bot_keyboard(),
         )
@@ -1463,7 +1463,7 @@ async def _cmd_notes_info(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     Explains how to use the /notes command with examples, then re-shows the main menu.
     """
     await update.effective_message.reply_text(
-        f"📝 *Adding Notes to a Lead*\n"
+        f"*Adding Notes to a Lead*\n"
         f"{_HR}\n\n"
         "Use the `/notes` command:\n\n"
         "`/notes <lead_number> <your note>`\n\n"
@@ -1472,7 +1472,7 @@ async def _cmd_notes_info(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         "▸ `/notes 1 Pre-approved for $550k, very motivated`\n\n"
         f"{_HR2}\n"
         "The lead number matches the # shown in the Qualified Leads or All Leads PDF.\n\n"
-        "💡 _Use /leads to download the latest qualified leads list._",
+        "_Use /leads to download the latest qualified leads list._",
         parse_mode=ParseMode.MARKDOWN,
         reply_markup=main_menu_keyboard(),
     )
@@ -1508,7 +1508,7 @@ async def handle_auto_reply(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         reply = lead_qualifier.generate_auto_reply(msg.text)
     else:
         reply = (
-            "I can only read text messages. 💬\n"
+            "I can only read text messages.\n"
             "Please type your question and I'll reply straight away!"
         )
     try:
@@ -1553,15 +1553,15 @@ async def handle_my_chat_member(update: Update, context: ContextTypes.DEFAULT_TY
             await context.bot.send_message(
                 chat_id=chat.id,
                 text=(
-                    "👋 *Real Estate Assistant has joined!*\n\n"
-                    "⚙️ *One quick setup step:*\n\n"
+                    "*Real Estate Assistant has joined!*\n\n"
+                    "*One quick setup step:*\n\n"
                     "To respond to *every message* in this group (not just "
                     "commands and replies to my messages), I need to be made "
                     "an *Administrator*.\n\n"
                     "Ask a group admin to:\n"
-                    "1️⃣ Open *Group Settings → Administrators*\n"
-                    "2️⃣ Tap *Add Admin* and select this bot\n"
-                    "3️⃣ Enable at least the *\"Manage Group\"* permission\n\n"
+                    "1. Open *Group Settings → Administrators*\n"
+                    "2. Tap *Add Admin* and select this bot\n"
+                    "3. Enable at least the *\"Manage Group\"* permission\n\n"
                     "_Until then I can only respond to /commands and direct "
                     "replies to my messages._"
                 ),
@@ -1581,9 +1581,9 @@ async def handle_my_chat_member(update: Update, context: ContextTypes.DEFAULT_TY
             await context.bot.send_message(
                 chat_id=chat.id,
                 text=(
-                    "✅ *All set! I'm now an Administrator.*\n\n"
+                    "✓ *All set! I'm now an Administrator.*\n\n"
                     "I can see every message in this group and will "
-                    "automatically reply to anyone who asks a question. 🏠"
+                    "automatically reply to anyone who asks a question."
                 ),
                 parse_mode=ParseMode.MARKDOWN,
                 reply_markup=ForceReply(selective=True),
@@ -1599,15 +1599,15 @@ async def handle_my_chat_member(update: Update, context: ContextTypes.DEFAULT_TY
 
 # Commands registered with Telegram so they appear in the "/" menu.
 _BOT_COMMANDS = [
-    BotCommand("start",   "🏠 Show main menu"),
-    BotCommand("post",    "📸 Post a new property listing"),
-    BotCommand("qualify", "🔍 AI-score a lead enquiry"),
-    BotCommand("leads",   "🎯 View qualified leads"),
-    BotCommand("performance", "📊 View performance stats"),
-    BotCommand("report",  "📈 Send weekly report now"),
-    BotCommand("notes",   "📝 Add a note to a lead"),
-    BotCommand("help",    "❓ Show all commands"),
-    BotCommand("myid",    "🪪 Show your Telegram chat ID"),
+    BotCommand("start",       "Show main menu"),
+    BotCommand("post",        "Post a new property listing"),
+    BotCommand("qualify",     "AI-score a lead enquiry"),
+    BotCommand("leads",       "View qualified leads"),
+    BotCommand("performance", "View performance stats"),
+    BotCommand("report",      "Send weekly report now"),
+    BotCommand("notes",       "Add a note to a lead"),
+    BotCommand("help",        "Show all commands"),
+    BotCommand("myid",        "Show your Telegram chat ID"),
 ]
 
 
@@ -1650,10 +1650,10 @@ async def _on_startup(app: Application) -> None:
                 app.bot,
                 chat_id=chat_id,
                 text=(
-                    f"🟢 *Real Estate Agent Assistant is Online!*\n"
+                    f"● *Real Estate Agent Assistant is Online!*\n"
                     f"{_HR}\n\n"
-                    "Your bot is up and ready. 🚀\n\n"
-                    "Tap a button below to get started 👇"
+                    "Your bot is up and ready.\n\n"
+                    "Tap a button below to get started ↓"
                 ),
                 reply_markup=main_menu_keyboard(),
             )

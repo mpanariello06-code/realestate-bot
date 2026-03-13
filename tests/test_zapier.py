@@ -375,15 +375,15 @@ class TestConfirmCallbackZapierPath(unittest.IsolatedAsyncioTestCase):
         _, context = await self._run_confirm({"success": True, "status_code": 200})
         context.bot.send_message.assert_awaited_once()
         text = context.bot.send_message.call_args[1]["text"]
-        self.assertIn("Zapier", text)
-        self.assertIn("✅", text)
+        self.assertIn("✓", text)
+        self.assertIn("successfully", text)
 
     async def test_confirm_via_zapier_sends_error_on_failure(self):
         _, context = await self._run_confirm(
             {"success": False, "error": "timeout"}
         )
         text = context.bot.send_message.call_args[1]["text"]
-        self.assertIn("❌", text)
+        self.assertIn("✗", text)
         self.assertIn("timeout", text)
 
     async def test_confirm_builds_structured_listing_payload(self):
@@ -621,9 +621,8 @@ class TestCmdZapier(unittest.IsolatedAsyncioTestCase):
         cfg.ZAPIER_WEBHOOK_URL = "https://hooks.zapier.com/hooks/catch/abc/"
         update = await self._call_cmd_zapier()
         reply = update.effective_message.reply_text.call_args[0][0]
-        self.assertIn("configured", reply)
-        self.assertIn("✅", reply)
-        self.assertIn("image_url", reply)
+        self.assertIn("Connected", reply)
+        self.assertIn("How it works", reply)
 
     async def test_not_authorised_agent_is_blocked(self):
         update = await self._call_cmd_zapier(chat_id=999999)

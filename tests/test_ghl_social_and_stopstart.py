@@ -497,14 +497,14 @@ class TestConfirmCallbackGhlPath(unittest.IsolatedAsyncioTestCase):
         context.bot.send_message.assert_awaited_once()
         text = context.bot.send_message.call_args[1]["text"]
         self.assertIn("GHL", text)
-        self.assertIn("✅", text)
+        self.assertIn("✓", text)
 
     async def test_confirm_via_ghl_sends_error_on_failure(self):
         _, context = await self._run_confirm(
             True, {"success": False, "error": "API down"}
         )
         text = context.bot.send_message.call_args[1]["text"]
-        self.assertIn("❌", text)
+        self.assertIn("✗", text)
         self.assertIn("API down", text)
 
     async def test_confirm_without_ghl_goes_to_platform_step(self):
