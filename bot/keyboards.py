@@ -7,12 +7,14 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 def main_menu_keyboard() -> InlineKeyboardMarkup:
     """
     Full function menu shown on /start and after every completed action.
-    Layout (5 rows):
+    Layout (7 rows):
       1. Primary actions — Post Listing | Qualify Lead
       2. Lead reports    — Qualified Leads | All Leads
       3. Analytics       — Performance | Weekly Report
-      4. Utilities       — Integrations | Notes | Help
-      5. Control         — Stop Marcello  (alone, reduces accidental taps)
+      4. CRM actions     — Follow-Ups | Appointments
+      5. Detail views    — Lead Detail | Tasks
+      6. Utilities       — Integrations | Notes | Help
+      7. Control         — Stop Marcello  (alone, reduces accidental taps)
     """
     return InlineKeyboardMarkup([
         [
@@ -26,6 +28,14 @@ def main_menu_keyboard() -> InlineKeyboardMarkup:
         [
             InlineKeyboardButton("Performance",     callback_data="performance"),
             InlineKeyboardButton("Weekly Report",   callback_data="weekly_report"),
+        ],
+        [
+            InlineKeyboardButton("Follow-Ups",      callback_data="follow_ups"),
+            InlineKeyboardButton("Appointments",    callback_data="appointments"),
+        ],
+        [
+            InlineKeyboardButton("Lead Detail",     callback_data="lead_detail"),
+            InlineKeyboardButton("Tasks",           callback_data="tasks"),
         ],
         [
             InlineKeyboardButton("Integrations",    callback_data="zapier_status"),
@@ -105,3 +115,42 @@ def qualify_action_keyboard() -> InlineKeyboardMarkup:
             InlineKeyboardButton("Discard", callback_data="qualify_discard"),
         ],
     ])
+
+
+def followup_section_keyboard() -> InlineKeyboardMarkup:
+    """Inline keyboard shown after the Follow-Ups summary."""
+    return InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("Due Today",  callback_data="followup_due_today"),
+            InlineKeyboardButton("Overdue",    callback_data="followup_overdue"),
+        ],
+        [
+            InlineKeyboardButton("Back to Menu", callback_data="back_to_menu"),
+        ],
+    ])
+
+
+def lead_detail_keyboard(lead_num: int, status: str = "new") -> InlineKeyboardMarkup:
+    """Contextual keyboard shown beneath a Lead Detail card."""
+    buttons = []
+    status_lower = status.lower()
+    if status_lower == "new":
+        buttons.append(
+            InlineKeyboardButton(
+                "Mark Contacted",
+                callback_data=f"lead_contacted_{lead_num - 1}",
+            )
+        )
+    if status_lower in ("new", "contacted"):
+        buttons.append(
+            InlineKeyboardButton(
+                "Mark Closed",
+                callback_data=f"lead_closed_{lead_num - 1}",
+            )
+        )
+    rows = [buttons] if buttons else []
+    rows.append(
+        [InlineKeyboardButton("Back to Menu", callback_data="back_to_menu")]
+    )
+    return InlineKeyboardMarkup(rows)
+

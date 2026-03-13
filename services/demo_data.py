@@ -210,6 +210,43 @@ DEMO_PERFORMANCE_TODAY: dict = {
     "response_rate_pct":      100,
 }
 
+# ── Demo appointments ─────────────────────────────────────────────────────────
+
+DEMO_APPOINTMENTS: list[dict] = [
+    {
+        "lead_num":     2,
+        "lead_name":    "Michael Chen",
+        "type":         "Valuation Call",
+        "datetime_str": "2025-03-14 14:00",
+        "note":         "Booked valuation call for Thursday 2 pm",
+        "source":       "demo",
+    },
+    {
+        "lead_num":     4,
+        "lead_name":    "James Wilson",
+        "type":         "Property Viewing",
+        "datetime_str": "2025-03-15 10:00",
+        "note":         "Sent 3 listings, viewing booked Saturday 10 am",
+        "source":       "demo",
+    },
+    {
+        "lead_num":     1,
+        "lead_name":    "Sarah Johnson",
+        "type":         "Consultation Call",
+        "datetime_str": "2025-03-16 11:00",
+        "note":         "Initial consultation call to discuss North York search",
+        "source":       "demo",
+    },
+    {
+        "lead_num":     8,
+        "lead_name":    "Robert Martinez",
+        "type":         "Showing",
+        "datetime_str": "2025-03-17 09:00",
+        "note":         "Showing 2 Oakville detached homes — relocating buyer",
+        "source":       "demo",
+    },
+]
+
 # ── Weekly platform performance records ───────────────────────────────────────
 
 DEMO_PERFORMANCE_WEEKLY: list[dict] = [

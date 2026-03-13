@@ -65,7 +65,9 @@ from telegram.ext import (
 import config
 from bot.keyboards import (
     confirm_post_keyboard,
+    followup_section_keyboard,
     lead_action_keyboard,
+    lead_detail_keyboard,
     main_menu_keyboard,
     posting_platform_keyboard,
     qualify_action_keyboard,
@@ -77,11 +79,15 @@ from services import ghl as ghl_service
 from services import zapier as zapier_service
 from services import cloudinary_upload
 from services.demo_data import (
+    DEMO_APPOINTMENTS,
     DEMO_LEADS,
     DEMO_PERFORMANCE_TODAY,
     DEMO_PERFORMANCE_WEEKLY,
 )
 from services.pdf_report import build_leads_pdf
+from services import followup as followup_service
+from services import appointments as appointments_service
+from services import tasks as tasks_service
 
 logger = logging.getLogger(__name__)
 
@@ -336,10 +342,10 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         "Your AI-powered property sales command centre.\n\n"
         "▸ *Post Listing*  — Publish to social media instantly\n"
         "▸ *Qualify Lead*  — AI lead scoring in seconds\n"
-        "▸ *Qualified Leads*  — Download qualified leads PDF\n"
-        "▸ *All Leads*  — Full leads database PDF\n"
-        "▸ *Performance*  — Today's key metrics\n"
-        "▸ *Weekly Report*  — Full analysis + downloadable PDF\n\n"
+        "▸ *Follow-Ups*  — Today's contacts and overdue leads\n"
+        "▸ *Appointments*  — Upcoming calls, viewings & showings\n"
+        "▸ *Lead Detail*  — Full profile for any lead\n"
+        "▸ *Tasks*  — Your prioritised daily action list\n\n"
         f"{_HR}\n"
         "Tap a button below to get started ↓",
         reply_markup=main_menu_keyboard(),
@@ -359,8 +365,14 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         "*Lead Management*\n"
         "`/qualify`  — AI-score a prospect enquiry\n"
         "`/leads`    — Download qualified leads PDF\n"
+        "`/lead <n>` — Full detail view for Lead #n\n"
         "`/notes`    — Add a note to a lead\n"
         "  _e.g._ `/notes 3 Viewing Saturday 2pm`\n\n"
+        "*Follow-Ups & CRM*\n"
+        "`/followups`  — Today's contacts and overdue leads\n"
+        "`/appointments`  — Upcoming calls, viewings & showings\n"
+        "`/appt <n> <note>`  — Add appointment note to Lead #n\n"
+        "`/tasks`  — Your prioritised daily task list\n\n"
         "*Analytics & Reports*\n"
         "`/performance`  — View today's stats\n"
         "`/report`       — Send the weekly report now\n\n"
@@ -1366,22 +1378,43 @@ async def cmd_start_bot(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     )
 
 
+async def _cmd_followup_due_today(
+    update: Update, context: ContextTypes.DEFAULT_TYPE
+) -> None:
+    """Menu callback wrapper — shows the 'due today' follow-up list."""
+    await _cmd_followup_section(update, context, "due_today")
+
+
+async def _cmd_followup_overdue(
+    update: Update, context: ContextTypes.DEFAULT_TYPE
+) -> None:
+    """Menu callback wrapper — shows the 'overdue' follow-up list."""
+    await _cmd_followup_section(update, context, "overdue")
+
+
 # ── Main menu callback ────────────────────────────────────────────────────────
 
 # Toast messages shown instantly when a menu button is tapped
 _MENU_TOASTS: dict[str, str] = {
-    "post_listing":    "Starting post flow…",
-    "qualify_lead":    "Opening qualify flow…",
-    "qualified_leads": "Loading qualified leads…",
-    "all_leads":       "Loading all leads…",
-    "performance":     "Loading performance…",
-    "weekly_report":   "Generating report…",
-    "zapier_status":   "Loading integrations…",
-    "ghl_status":      "Loading GHL status…",
-    "notes_info":      "Opening notes guide…",
-    "help":            "Loading help…",
-    "stop_bot":        "■ Taking Marcello offline…",
-    "start_bot":       "▶ Starting Assistant…",
+    "post_listing":       "Starting post flow…",
+    "qualify_lead":       "Opening qualify flow…",
+    "qualified_leads":    "Loading qualified leads…",
+    "all_leads":          "Loading all leads…",
+    "performance":        "Loading performance…",
+    "weekly_report":      "Generating report…",
+    "zapier_status":      "Loading integrations…",
+    "ghl_status":         "Loading GHL status…",
+    "notes_info":         "Opening notes guide…",
+    "help":               "Loading help…",
+    "follow_ups":         "Loading follow-ups…",
+    "appointments":       "Loading appointments…",
+    "lead_detail":        "Opening lead detail guide…",
+    "tasks":              "Loading task list…",
+    "followup_due_today": "Loading due-today leads…",
+    "followup_overdue":   "Loading overdue leads…",
+    "back_to_menu":       "Back to menu…",
+    "stop_bot":           "■ Taking Marcello offline…",
+    "start_bot":          "▶ Starting Assistant…",
 }
 
 
@@ -1442,15 +1475,22 @@ async def handle_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYP
     await query.answer(toast)
 
     cmd_map = {
-        "qualify_lead":    cmd_qualify,
-        "qualified_leads": cmd_leads,
-        "all_leads":       cmd_all_leads,
-        "performance":     cmd_performance,
-        "weekly_report":   cmd_report,
-        "zapier_status":   cmd_zapier,
-        "ghl_status":      cmd_ghl,
-        "help":            cmd_help,
-        "notes_info":      _cmd_notes_info,
+        "qualify_lead":       cmd_qualify,
+        "qualified_leads":    cmd_leads,
+        "all_leads":          cmd_all_leads,
+        "performance":        cmd_performance,
+        "weekly_report":      cmd_report,
+        "zapier_status":      cmd_zapier,
+        "ghl_status":         cmd_ghl,
+        "help":               cmd_help,
+        "notes_info":         _cmd_notes_info,
+        "follow_ups":         cmd_followups,
+        "appointments":       cmd_appointments,
+        "lead_detail":        _cmd_lead_detail_info,
+        "tasks":              cmd_tasks,
+        "followup_due_today": _cmd_followup_due_today,
+        "followup_overdue":   _cmd_followup_overdue,
+        "back_to_menu":       cmd_start,
     }
     handler = cmd_map.get(query.data)
     if handler:
@@ -1473,6 +1513,344 @@ async def _cmd_notes_info(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         f"{_HR2}\n"
         "The lead number matches the # shown in the Qualified Leads or All Leads PDF.\n\n"
         "_Use /leads to download the latest qualified leads list._",
+        parse_mode=ParseMode.MARKDOWN,
+        reply_markup=main_menu_keyboard(),
+    )
+
+
+# ── Follow-Ups ────────────────────────────────────────────────────────────────
+
+async def cmd_followups(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Show today's follow-up summary: due contacts and overdue leads."""
+    if not await _agent_only(update, context):
+        return
+
+    threshold = config.LEAD_QUALIFICATION_THRESHOLD
+    leads = sheets.get_leads(qualified_only=False) or DEMO_LEADS
+    summary = followup_service.summarise(leads, threshold=threshold)
+
+    due_today = summary["due_today"]
+    overdue   = summary["overdue"]
+
+    # ── Summary header ────────────────────────────────────────────────────
+    await update.effective_message.reply_text(
+        f"*Follow-Up Centre*\n"
+        f"{_HR}\n\n"
+        f"Due Today:  *{len(due_today)}* qualified lead(s) awaiting first contact\n"
+        f"Overdue:    *{len(overdue)}* lead(s) not contacted within 48 h\n\n"
+        "_Tap a section below or use the commands:_\n"
+        "`/followups due`  — view due-today list\n"
+        "`/followups overdue`  — view overdue list",
+        parse_mode=ParseMode.MARKDOWN,
+        reply_markup=followup_section_keyboard(),
+    )
+
+
+async def _cmd_followup_section(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
+    section: str,
+) -> None:
+    """Send the detail list for *section* ('due_today' or 'overdue')."""
+    threshold = config.LEAD_QUALIFICATION_THRESHOLD
+    leads = sheets.get_leads(qualified_only=False) or DEMO_LEADS
+    summary = followup_service.summarise(leads, threshold=threshold)
+
+    items: list[tuple[int, dict]] = summary[section]
+    label = "Due Today" if section == "due_today" else "Overdue (> 48 h)"
+
+    if not items:
+        await update.effective_message.reply_text(
+            f"No leads in the *{label}* bucket right now. All clear.",
+            parse_mode=ParseMode.MARKDOWN,
+            reply_markup=main_menu_keyboard(),
+        )
+        return
+
+    for rank, (lead_num, lead) in enumerate(items, 1):
+        name  = f"{lead.get('first_name', '')} {lead.get('last_name', '')}".strip() or "Unknown"
+        score = int(lead.get("score") or 0)
+        intent = (lead.get("intent") or "unknown").title()
+        phone  = lead.get("phone") or "N/A"
+        nudge  = followup_service.build_nudge_message(lead)
+
+        card = (
+            f"*{rank}. {name}*  (Lead #{lead_num})\n"
+            f"Score: {score}/100  ·  Intent: {intent}\n"
+            f"Tel:   {phone}\n"
+            f"{_HR2}\n"
+            f"*Nudge template:*\n_{nudge}_"
+        )
+        await update.effective_message.reply_text(
+            card,
+            parse_mode=ParseMode.MARKDOWN,
+            reply_markup=lead_action_keyboard(lead_num - 1),
+        )
+
+    await update.effective_message.reply_text(
+        f"*{len(items)} lead(s) shown.*\n"
+        "Use the action buttons above to update each lead's status.",
+        parse_mode=ParseMode.MARKDOWN,
+        reply_markup=main_menu_keyboard(),
+    )
+
+
+# ── Appointments / Bookings ───────────────────────────────────────────────────
+
+async def cmd_appointments(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Show upcoming scheduled calls, viewings, and consultations."""
+    if not await _agent_only(update, context):
+        return
+
+    leads = sheets.get_leads(qualified_only=False) or DEMO_LEADS
+    all_appts = appointments_service.get_all_appointments(DEMO_APPOINTMENTS, leads)
+
+    if not all_appts:
+        await update.effective_message.reply_text(
+            "*Appointments*\n\n"
+            "No appointments scheduled yet.\n\n"
+            "Add one with:\n"
+            "`/appt <lead_number> <note>`\n"
+            "_e.g._ `/appt 2 Viewing call Thursday 3 pm`",
+            parse_mode=ParseMode.MARKDOWN,
+            reply_markup=main_menu_keyboard(),
+        )
+        return
+
+    header = (
+        f"*Upcoming Appointments*\n"
+        f"{_HR}\n"
+        f"{len(all_appts)} scheduled event(s)\n\n"
+    )
+
+    cards = []
+    for idx, appt in enumerate(all_appts, 1):
+        cards.append(appointments_service.format_appointment_card(appt, idx))
+
+    body = f"\n{_HR2}\n".join(cards)
+    await update.effective_message.reply_text(
+        header + body,
+        parse_mode=ParseMode.MARKDOWN,
+        reply_markup=main_menu_keyboard(),
+    )
+
+
+async def cmd_appt(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """/appt <lead_number> <note>  — add an appointment note to a lead."""
+    if not await _agent_only(update, context):
+        return
+
+    args = context.args or []
+    if len(args) < 2 or not args[0].isdigit():
+        await update.effective_message.reply_text(
+            "Usage: `/appt <lead_number> <note>`\n"
+            "Example: `/appt 2 Viewing call Thursday 3 pm`",
+            parse_mode=ParseMode.MARKDOWN,
+        )
+        return
+
+    lead_num  = int(args[0])
+    note_text = " ".join(args[1:])
+    success   = sheets.save_lead_notes(lead_num, note_text)
+    if success:
+        await update.effective_message.reply_text(
+            f"✓ Appointment note saved for Lead #{lead_num}:\n_{note_text}_",
+            parse_mode=ParseMode.MARKDOWN,
+            reply_markup=main_menu_keyboard(),
+        )
+    else:
+        await update.effective_message.reply_text(
+            f"✗ Could not save appointment note for Lead #{lead_num}. "
+            "Check the lead number and your Google Sheets connection.",
+            reply_markup=main_menu_keyboard(),
+        )
+
+
+# ── Lead Detail View ──────────────────────────────────────────────────────────
+
+def _format_lead_detail(lead_num: int, lead: dict) -> str:
+    """Render a comprehensive Lead Detail card."""
+    first  = lead.get("first_name") or ""
+    last   = lead.get("last_name") or ""
+    name   = f"{first} {last}".strip() or "Unknown"
+    email  = lead.get("email") or "N/A"
+    phone  = lead.get("phone") or "N/A"
+    source = (lead.get("platform") or "unknown").title()
+    intent = (lead.get("intent") or "unknown").title()
+    score  = int(lead.get("score") or 0)
+    budget   = lead.get("budget") or "Not mentioned"
+    timeline = lead.get("timeline") or "Not mentioned"
+    location = lead.get("location") or "Not mentioned"
+    summary  = lead.get("summary") or ""
+    message  = lead.get("message") or ""
+    status   = (lead.get("status") or "new").title()
+    notes    = lead.get("agent_notes") or "None"
+    timestamp = lead.get("timestamp") or ""
+
+    # Next-action recommendation
+    status_lower = status.lower()
+    if status_lower == "new" and score >= config.LEAD_QUALIFICATION_THRESHOLD:
+        next_action = "Make first contact — call or send a personalised message today"
+    elif status_lower == "contacted":
+        next_action = "Follow up — check if they have questions or are ready to advance"
+    elif status_lower == "closed":
+        next_action = "Request referrals and ask for a review"
+    elif status_lower == "lost":
+        next_action = "Add to long-term nurture list; re-engage in 3–6 months"
+    else:
+        next_action = "Qualify further before investing time in follow-up"
+
+    parts = [
+        f"*Lead #{lead_num} — {name}*",
+        f"{_HR}",
+        f"Source:    {source}",
+    ]
+    if timestamp:
+        parts.append(f"Received:  {timestamp[:10]}")
+    parts += [
+        f"{_HR2}",
+        f"*Contact*",
+        f"Tel:   {phone}",
+        f"Email: {email}",
+        f"{_HR2}",
+        f"*Qualification*",
+        f"Score:    {score}/100",
+        f"Intent:   {intent}",
+        f"Budget:   {budget}",
+        f"Timeline: {timeline}",
+        f"Location: {location}",
+    ]
+    if summary:
+        parts += [f"{_HR2}", f"*AI Summary*", summary]
+    if message:
+        short_msg = message[:200] + ("…" if len(message) > 200 else "")
+        parts += [f"{_HR2}", f"*Original Enquiry*", f"_{short_msg}_"]
+    parts += [
+        f"{_HR2}",
+        f"*Agent Notes*",
+        notes,
+        f"{_HR}",
+        f"*Status:*  {status}",
+        f"*Next Action:*  {next_action}",
+    ]
+    return "\n".join(parts)
+
+
+async def cmd_lead_detail(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """/lead <number>  — show the full detail card for a single lead."""
+    if not await _agent_only(update, context):
+        return
+
+    args = context.args or []
+    if not args or not args[0].isdigit():
+        await update.effective_message.reply_text(
+            "Usage: `/lead <lead_number>`\n"
+            "Example: `/lead 3`\n\n"
+            "The number matches the # shown in the Qualified Leads or All Leads PDF.",
+            parse_mode=ParseMode.MARKDOWN,
+            reply_markup=main_menu_keyboard(),
+        )
+        return
+
+    lead_num = int(args[0])
+    leads    = sheets.get_leads(qualified_only=False) or DEMO_LEADS
+
+    if lead_num < 1 or lead_num > len(leads):
+        await update.effective_message.reply_text(
+            f"Lead #{lead_num} not found. "
+            f"There are currently {len(leads)} leads in the database.",
+            reply_markup=main_menu_keyboard(),
+        )
+        return
+
+    lead   = leads[lead_num - 1]
+    status = lead.get("status", "new")
+    card   = _format_lead_detail(lead_num, lead)
+    await update.effective_message.reply_text(
+        card,
+        parse_mode=ParseMode.MARKDOWN,
+        reply_markup=lead_detail_keyboard(lead_num, status),
+    )
+
+
+async def _cmd_lead_detail_info(
+    update: Update, context: ContextTypes.DEFAULT_TYPE
+) -> None:
+    """Menu callback for 'Lead Detail' — prompt the agent for a lead number."""
+    await update.effective_message.reply_text(
+        f"*Lead Detail View*\n"
+        f"{_HR}\n\n"
+        "Type `/lead <number>` to view the full profile for any lead.\n\n"
+        "*Example:*\n"
+        "`/lead 3`\n\n"
+        "This shows:\n"
+        "▸ Source & contact details\n"
+        "▸ AI qualification score, budget & timeline\n"
+        "▸ Original enquiry message\n"
+        "▸ Agent notes\n"
+        "▸ Recommended next action",
+        parse_mode=ParseMode.MARKDOWN,
+        reply_markup=main_menu_keyboard(),
+    )
+
+
+# ── Tasks / Reminders ─────────────────────────────────────────────────────────
+
+async def cmd_tasks(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Show today's prioritised task list for the agent."""
+    if not await _agent_only(update, context):
+        return
+
+    threshold = config.LEAD_QUALIFICATION_THRESHOLD
+    leads     = sheets.get_leads(qualified_only=False) or DEMO_LEADS
+    task_list = tasks_service.get_tasks(leads, threshold=threshold)
+
+    if not task_list:
+        await update.effective_message.reply_text(
+            "*Tasks*\n\n"
+            "Nothing on your task list right now — great work!",
+            parse_mode=ParseMode.MARKDOWN,
+            reply_markup=main_menu_keyboard(),
+        )
+        return
+
+    high   = [t for t in task_list if t["priority"] == "high"]
+    medium = [t for t in task_list if t["priority"] == "medium"]
+    low    = [t for t in task_list if t["priority"] == "low"]
+
+    lines = [
+        f"*Daily Task List*",
+        f"{_HR}",
+        f"Total tasks: *{len(task_list)}*  "
+        f"(High: {len(high)}  ·  Medium: {len(medium)}  ·  Low: {len(low)})",
+        "",
+    ]
+
+    if high:
+        lines.append("*[ ! ] High Priority — Act Today*")
+        for idx, task in enumerate(high, 1):
+            lines.append(tasks_service.format_task_line(task, idx))
+        lines.append("")
+
+    if medium:
+        lines.append("*[ + ] Medium Priority — Follow Up*")
+        for idx, task in enumerate(medium, 1):
+            lines.append(tasks_service.format_task_line(task, idx))
+        lines.append("")
+
+    if low:
+        lines.append("*[ · ] Low Priority — Nurture*")
+        for idx, task in enumerate(low, 1):
+            lines.append(tasks_service.format_task_line(task, idx))
+        lines.append("")
+
+    lines.append(
+        f"{_HR}\n"
+        "_Use `/lead <n>` for full details on any lead._"
+    )
+
+    await update.effective_message.reply_text(
+        "\n".join(lines),
         parse_mode=ParseMode.MARKDOWN,
         reply_markup=main_menu_keyboard(),
     )
@@ -1599,15 +1977,20 @@ async def handle_my_chat_member(update: Update, context: ContextTypes.DEFAULT_TY
 
 # Commands registered with Telegram so they appear in the "/" menu.
 _BOT_COMMANDS = [
-    BotCommand("start",       "Show main menu"),
-    BotCommand("post",        "Post a new property listing"),
-    BotCommand("qualify",     "AI-score a lead enquiry"),
-    BotCommand("leads",       "View qualified leads"),
-    BotCommand("performance", "View performance stats"),
-    BotCommand("report",      "Send weekly report now"),
-    BotCommand("notes",       "Add a note to a lead"),
-    BotCommand("help",        "Show all commands"),
-    BotCommand("myid",        "Show your Telegram chat ID"),
+    BotCommand("start",        "Show main menu"),
+    BotCommand("post",         "Post a new property listing"),
+    BotCommand("qualify",      "AI-score a lead enquiry"),
+    BotCommand("leads",        "View qualified leads"),
+    BotCommand("followups",    "Follow-ups due today and overdue"),
+    BotCommand("appointments", "View scheduled calls and viewings"),
+    BotCommand("lead",         "View full detail for a lead"),
+    BotCommand("appt",         "Add an appointment note to a lead"),
+    BotCommand("tasks",        "View your daily task list"),
+    BotCommand("performance",  "View performance stats"),
+    BotCommand("report",       "Send weekly report now"),
+    BotCommand("notes",        "Add a note to a lead"),
+    BotCommand("help",         "Show all commands"),
+    BotCommand("myid",         "Show your Telegram chat ID"),
 ]
 
 
@@ -1757,6 +2140,12 @@ def build_application() -> Application:
     app.add_handler(CommandHandler("zapier", cmd_zapier))
     app.add_handler(CommandHandler("stopbot", cmd_stop_bot))
     app.add_handler(CommandHandler("startbot", cmd_start_bot))
+    # New commands: follow-ups, appointments, lead detail, tasks
+    app.add_handler(CommandHandler("followups", cmd_followups))
+    app.add_handler(CommandHandler("appointments", cmd_appointments))
+    app.add_handler(CommandHandler("lead", cmd_lead_detail))
+    app.add_handler(CommandHandler("appt", cmd_appt))
+    app.add_handler(CommandHandler("tasks", cmd_tasks))
 
     # Callback query handlers
     app.add_handler(
@@ -1765,7 +2154,15 @@ def build_application() -> Application:
     app.add_handler(
         CallbackQueryHandler(
             handle_menu_callback,
-            pattern="^(qualify_lead|performance|qualified_leads|all_leads|weekly_report|zapier_status|ghl_status|notes_info|help|stop_bot|start_bot)$",
+            pattern=(
+                r"^("
+                r"qualify_lead|performance|qualified_leads|all_leads"
+                r"|weekly_report|zapier_status|ghl_status|notes_info|help"
+                r"|stop_bot|start_bot"
+                r"|follow_ups|appointments|lead_detail|tasks"
+                r"|followup_due_today|followup_overdue|back_to_menu"
+                r")$"
+            ),
         )
     )
 
