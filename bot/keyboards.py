@@ -7,28 +7,33 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 def main_menu_keyboard() -> InlineKeyboardMarkup:
     """
     Full function menu shown on /start and after every completed action.
-    Every button triggers an instant toast auto-reply via query.answer(text=…).
+    Layout (5 rows):
+      1. Primary actions — Post Listing | Qualify Lead
+      2. Lead reports    — Qualified Leads | All Leads
+      3. Analytics       — Performance | Weekly Report
+      4. Utilities       — Integrations | Notes | Help
+      5. Control         — Stop Bot  (alone, reduces accidental taps)
     """
     return InlineKeyboardMarkup([
         [
-            InlineKeyboardButton("📸 Post Listing", callback_data="post_listing"),
-            InlineKeyboardButton("🔍 Qualify Lead", callback_data="qualify_lead"),
+            InlineKeyboardButton("📸 Post Listing",    callback_data="post_listing"),
+            InlineKeyboardButton("🔍 Qualify Lead",    callback_data="qualify_lead"),
         ],
         [
             InlineKeyboardButton("🎯 Qualified Leads", callback_data="qualified_leads"),
-            InlineKeyboardButton("📋 All Leads", callback_data="all_leads"),
+            InlineKeyboardButton("📋 All Leads",       callback_data="all_leads"),
         ],
         [
-            InlineKeyboardButton("📊 Performance", callback_data="performance"),
-            InlineKeyboardButton("📈 Weekly Report", callback_data="weekly_report"),
+            InlineKeyboardButton("📊 Performance",     callback_data="performance"),
+            InlineKeyboardButton("📈 Weekly Report",   callback_data="weekly_report"),
         ],
         [
-            InlineKeyboardButton("⚙️ Integrations", callback_data="zapier_status"),
-            InlineKeyboardButton("📝 Notes Help", callback_data="notes_info"),
+            InlineKeyboardButton("⚙️ Integrations",   callback_data="zapier_status"),
+            InlineKeyboardButton("📝 Notes",           callback_data="notes_info"),
+            InlineKeyboardButton("❓ Help",            callback_data="help"),
         ],
         [
-            InlineKeyboardButton("❓ Help", callback_data="help"),
-            InlineKeyboardButton("⏹ Stop Bot", callback_data="stop_bot"),
+            InlineKeyboardButton("⏹ Stop Bot",        callback_data="stop_bot"),
         ],
     ])
 

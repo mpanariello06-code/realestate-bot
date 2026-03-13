@@ -84,6 +84,10 @@ from services.pdf_report import build_leads_pdf
 
 logger = logging.getLogger(__name__)
 
+# Visual separator used across all bot messages (renders as a solid line on mobile)
+_HR  = "━" * 28   # primary section divider
+_HR2 = "─" * 28   # secondary / sub-section divider
+
 # Whether the bot is paused (Stop Bot was pressed).
 # When True every agent-only command/callback returns a paused message.
 _bot_paused: bool = False
@@ -309,15 +313,16 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     _bot_paused = False
     await _send_with_banner(
         update.effective_message,
-        "🏠 *Real Estate Agent Assistant*\n\n"
-        "Welcome! Here's what I can do for you:\n\n"
-        "📸 *Post Listing* — Publish a property to social media\n"
-        "🔍 *Qualify Lead* — Score & analyse enquiries with AI\n"
-        "🎯 *Qualified Leads* — View your top leads\n"
-        "📋 *All Leads* — Browse your full leads list\n"
-        "📊 *Performance* — Track your key metrics\n"
-        "📈 *Weekly Report* — Get a detailed performance summary\n"
-        "⚙️ *Integrations* — Check your connection status\n\n"
+        f"🏠 *Real Estate Agent Assistant*\n"
+        f"{_HR}\n"
+        "Your AI-powered property sales command centre. 🚀\n\n"
+        "▸ 📸 *Post Listing*  — Publish to social media instantly\n"
+        "▸ 🔍 *Qualify Lead*  — AI lead scoring in seconds\n"
+        "▸ 🎯 *Qualified Leads*  — Download qualified leads PDF\n"
+        "▸ 📋 *All Leads*  — Full leads database PDF\n"
+        "▸ 📊 *Performance*  — Today's key metrics\n"
+        "▸ 📈 *Weekly Report*  — Full analysis + downloadable PDF\n\n"
+        f"{_HR}\n"
         "Tap a button below to get started 👇",
         reply_markup=main_menu_keyboard(),
     )
@@ -329,21 +334,27 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not await _agent_only(update, context):
         return
     await update.effective_message.reply_text(
-        "📖 *Available Commands*\n\n"
-        "/start — Show main menu\n"
-        "/post — Post a new property listing\n"
-        "/qualify — AI-score an enquiry message\n"
-        "/leads — View qualified leads\n"
-        "/notes — Add a note to a lead\n"
-        "  _e.g._ `/notes 3 Viewing Saturday 2pm`\n"
-        "/performance — View performance stats\n"
-        "/report — Send the weekly report now\n"
-        "/ghl — CRM integration status\n"
-        "/stopbot — Pause the bot\n"
-        "/startbot — Resume the bot\n"
-        "/myid — Show your Telegram chat ID\n"
-        "/help — This help message\n\n"
-        "💡 Tip: Use the buttons below for quick access.",
+        f"📖 *Commands & Help*\n"
+        f"{_HR}\n\n"
+        "*📸 Listing*\n"
+        "`/post`  — Post a new property listing\n\n"
+        "*🔍 Lead Management*\n"
+        "`/qualify`  — AI-score a prospect enquiry\n"
+        "`/leads`    — Download qualified leads PDF\n"
+        "`/notes`    — Add a note to a lead\n"
+        "  _e.g._ `/notes 3 Viewing Saturday 2pm`\n\n"
+        "*📊 Analytics & Reports*\n"
+        "`/performance`  — View today's stats\n"
+        "`/report`       — Send the weekly report now\n\n"
+        "*⚙️ Integrations*\n"
+        "`/ghl`     — CRM integration status\n"
+        "`/zapier`  — Automation status\n\n"
+        "*🔧 Bot Control*\n"
+        "`/stopbot`   — Pause the bot\n"
+        "`/startbot`  — Resume the bot\n"
+        "`/myid`      — Show your Telegram chat ID\n\n"
+        f"{_HR}\n"
+        "💡 _Tap any button below for quick access._",
         parse_mode=ParseMode.MARKDOWN,
         reply_markup=main_menu_keyboard(),
     )
@@ -427,9 +438,10 @@ async def cmd_qualify(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     total = len(all_leads)
 
     await update.effective_message.reply_text(
-        "🤖 *AI Lead Qualification Engine*\n\n"
-        f"Scanning *{total}* lead(s) in the database…\n"
-        "_This may take a moment._",
+        f"🤖 *AI Lead Qualification Engine*\n"
+        f"{_HR}\n"
+        f"⏳ Scanning *{total}* lead(s) in the database…\n"
+        f"_Analysing intent, budget, timeline & fit…_",
         parse_mode=ParseMode.MARKDOWN,
     )
 
@@ -441,18 +453,20 @@ async def cmd_qualify(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     n_qualified = len(qualified)
 
     await update.effective_message.reply_text(
-        f"✅ *Scan Complete*\n\n"
-        f"📊 Leads analysed: *{total}*\n"
-        f"🎯 Qualified leads found: *{n_qualified}*\n"
-        f"📁 All qualified leads have been saved to the database.\n\n"
-        f"*Qualification threshold:* {threshold}/100",
+        f"✅ *Scan Complete*\n"
+        f"{_HR}\n\n"
+        f"📊 Leads analysed:   *{total}*\n"
+        f"🎯 Leads qualified:  *{n_qualified}*\n"
+        f"📁 Database updated\n\n"
+        f"_{_HR2}_\n"
+        f"_Threshold: {threshold}/100_",
         parse_mode=ParseMode.MARKDOWN,
     )
 
     if not qualified:
         await update.effective_message.reply_text(
-            "No leads currently meet the qualification threshold. "
-            "Keep collecting enquiries — new leads will be scored automatically. 🚀",
+            "📭 No leads currently meet the qualification threshold.\n"
+            "Keep collecting enquiries — they will be scored automatically. 🚀",
             reply_markup=main_menu_keyboard(),
         )
         return
@@ -478,23 +492,26 @@ async def cmd_qualify(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
             badge = "🟡 Borderline"
 
         await update.effective_message.reply_text(
-            f"*🎯 Qualified Lead #{i}*\n\n"
-            f"👤 *{name}*\n"
-            f"📞 {phone}\n"
-            f"📧 {email}\n"
-            f"🏠 Intent: {intent}\n"
-            f"📍 Location: {location}\n"
-            f"💰 Budget: {budget}\n"
-            f"⏰ Timeline: {timeline}\n"
-            f"⭐ Score: *{score}/100* — {badge}\n"
-            f"📌 Status: {status}\n"
-            f"📝 {summary}",
+            f"🎯 *Qualified Lead #{i}*  —  {badge}\n"
+            f"{_HR}\n"
+            f"👤  *{name}*\n"
+            f"📞  {phone}\n"
+            f"📧  {email}\n"
+            f"{_HR2}\n"
+            f"🏠  Intent:    *{intent}*\n"
+            f"📍  Location:  {location}\n"
+            f"💰  Budget:    {budget}\n"
+            f"⏰  Timeline:  {timeline}\n"
+            f"{_HR2}\n"
+            f"⭐  Score:  *{score}/100*\n"
+            f"📌  Status: {status}\n\n"
+            f"📝 _{summary}_",
             parse_mode=ParseMode.MARKDOWN,
         )
 
     await update.effective_message.reply_text(
-        f"*{n_qualified} qualified lead(s) identified.*\n\n"
-        "Tap *Qualified Leads* to download the full report as a PDF.",
+        f"✅ *{n_qualified} qualified lead(s) identified.*\n\n"
+        "Tap *Qualified Leads* to download the full report as a PDF. 👇",
         parse_mode=ParseMode.MARKDOWN,
         reply_markup=main_menu_keyboard(),
     )
@@ -601,8 +618,9 @@ async def cmd_leads(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         return
 
     await update.effective_message.reply_text(
-        "🎯 *Generating Qualified Leads Report…*\n"
-        "_Building your PDF — this will only take a moment._",
+        f"🎯 *Generating Qualified Leads Report*\n"
+        f"{_HR}\n"
+        "⏳ Building your PDF — this will only take a moment…",
         parse_mode=ParseMode.MARKDOWN,
     )
 
@@ -613,7 +631,7 @@ async def cmd_leads(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
     if not leads:
         await update.effective_message.reply_text(
-            "No qualified leads yet. Keep posting – they're coming! 🚀",
+            "📭 No qualified leads yet.\nKeep posting — they're on their way! 🚀",
             reply_markup=main_menu_keyboard(),
         )
         return
@@ -630,8 +648,9 @@ async def cmd_leads(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         document=io.BytesIO(pdf_bytes),
         filename=filename,
         caption=(
-            f"🎯 *Qualified Leads Report* — {len(leads)} lead(s)\n"
-            "Tap to open or forward to your team."
+            f"🎯 *Qualified Leads Report*\n"
+            f"📊 {len(leads)} qualified lead(s) · {today.strftime('%d %b %Y')}\n\n"
+            "Tap to open or forward to your team. 👆"
         ),
         parse_mode=ParseMode.MARKDOWN,
         reply_markup=main_menu_keyboard(),
@@ -683,8 +702,9 @@ async def cmd_all_leads(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         return
 
     await update.effective_message.reply_text(
-        "📋 *Generating All Leads Report…*\n"
-        "_Building your PDF — this will only take a moment._",
+        f"📋 *Generating All Leads Report*\n"
+        f"{_HR}\n"
+        "⏳ Building your PDF — this will only take a moment…",
         parse_mode=ParseMode.MARKDOWN,
     )
 
@@ -717,9 +737,10 @@ async def cmd_all_leads(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         document=io.BytesIO(pdf_bytes),
         filename=filename,
         caption=(
-            f"📋 *All Leads Report* — {total} lead(s) "
-            f"({n_qual} qualified, {n_unqual} unqualified)\n"
-            "Tap to open or forward to your team."
+            f"📋 *All Leads Report*\n"
+            f"📊 {total} leads  ·  ✅ {n_qual} qualified  ·  ⏳ {n_unqual} unqualified\n"
+            f"📅 {today.strftime('%d %b %Y')}\n\n"
+            "Tap to open or forward to your team. 👆"
         ),
         parse_mode=ParseMode.MARKDOWN,
         reply_markup=main_menu_keyboard(),
@@ -727,6 +748,14 @@ async def cmd_all_leads(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 
 
 # ── /performance ──────────────────────────────────────────────────────────────
+
+def _platform_stats_line(icon: str, name: str, followers: int, engagement: float) -> str:
+    """Format a single social-media platform stats block for the performance message."""
+    return (
+        f"  {icon} {name}\n"
+        f"     👥 *{followers:,}* followers  ·  💡 *{engagement}%* engagement\n"
+    )
+
 
 async def cmd_performance(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Show today's key performance metrics."""
@@ -737,25 +766,30 @@ async def cmd_performance(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
     p = DEMO_PERFORMANCE_TODAY
 
+    social_lines = (
+        _platform_stats_line("📷", "Instagram", p["instagram_followers"], p["instagram_engagement"])
+        + _platform_stats_line("📘", "Facebook", p["facebook_followers"], p["facebook_engagement"])
+    )
+
     await update.effective_message.reply_text(
         f"📊 *Performance Dashboard*\n"
-        f"📅 {today_label}\n"
-        f"{'─' * 32}\n\n"
-        f"*🏠 Lead Activity*\n"
-        f"  • New leads today: *{p['new_leads']}*\n"
-        f"  • Qualified: *{p['qualified_leads']}*\n"
-        f"  • Response rate: *{p['response_rate_pct']}%*\n"
-        f"  • Avg response time: *{p['avg_response_min']} min*\n\n"
-        f"*💬 Messaging*\n"
-        f"  • Messages handled: *{p['messages_handled']}*\n\n"
-        f"*📱 Social Media — Today*\n"
-        f"  📷 Instagram: *{p['instagram_followers']:,}* followers "
-        f"| *{p['instagram_engagement']}%* engagement\n"
-        f"  📘 Facebook: *{p['facebook_followers']:,}* followers "
-        f"| *{p['facebook_engagement']}%* engagement\n"
-        f"  • Posts published today: *{p['posts_today']}*\n"
-        f"  • Total views: *{p['views_today']:,}*\n\n"
-        f"💡 _Tap Weekly Report for full metrics and a downloadable PDF._",
+        f"{_HR}\n"
+        f"📅 {today_label}\n\n"
+        f"🏠 *Lead Activity*\n"
+        f"  New leads:       *{p['new_leads']}*\n"
+        f"  Qualified:       *{p['qualified_leads']}*\n"
+        f"  Response rate:   *{p['response_rate_pct']}%* ✅\n"
+        f"  Avg response:    *{p['avg_response_min']} min* ⚡\n\n"
+        f"{_HR2}\n"
+        f"💬 *Messaging*\n"
+        f"  Messages handled: *{p['messages_handled']}* today\n\n"
+        f"{_HR2}\n"
+        f"📱 *Social Media*\n"
+        + social_lines
+        + f"\n  🖼 Posts today: *{p['posts_today']}*"
+        f"  ·  👁 Views: *{p['views_today']:,}*\n\n"
+        f"{_HR}\n"
+        f"💡 _Tap Weekly Report for the full analysis PDF._",
         parse_mode=ParseMode.MARKDOWN,
         reply_markup=main_menu_keyboard(),
     )
@@ -766,7 +800,13 @@ async def cmd_performance(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 async def cmd_report(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not await _agent_only(update, context):
         return
-    await update.effective_message.reply_text("📈 Generating your weekly report…")
+    await update.effective_message.reply_text(
+        f"📈 *Generating Weekly Report*\n"
+        f"{_HR}\n"
+        "⏳ Compiling metrics and building your PDF…\n"
+        "_This will only take a moment._",
+        parse_mode=ParseMode.MARKDOWN,
+    )
     await send_weekly_report(context.bot)
 
 
@@ -873,9 +913,11 @@ async def cmd_post(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     else:
         channel_note = "You will choose the target platform after confirming the caption."
     await update.effective_message.reply_text(
-        "📸 *New Listing Post*\n\n"
+        f"📸 *New Listing Post*\n"
+        f"{_HR}\n"
+        f"_Step 1 of 6 — Media_\n\n"
         "Please send me a *photo or video* of the property, "
-        "or send a text description if you have no media.\n\n"
+        "or type a text description if you have no media.\n\n"
         + channel_note,
         parse_mode=ParseMode.MARKDOWN,
         reply_markup=ForceReply(selective=True),
@@ -914,9 +956,10 @@ async def handle_media(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
     context.user_data[CTX_MEDIA_TYPE] = media_type
 
     await msg.reply_text(
-        "✅ Media received!\n\n"
-        "Now send me a *short description* of the property "
-        "(e.g. '3-bed house in Miami, $450k, pool, renovated kitchen').",
+        "✅ *Media received!*\n\n"
+        "_Step 2 of 6 — Description_\n\n"
+        "Now send me a *short description* of the property.\n"
+        "_e.g. 3-bed house in Miami, $450k, pool, renovated kitchen_",
         parse_mode=ParseMode.MARKDOWN,
         reply_markup=ForceReply(selective=True),
     )
@@ -936,8 +979,10 @@ async def handle_description(update: Update, context: ContextTypes.DEFAULT_TYPE)
     if zapier_service.is_configured():
         await update.effective_message.reply_text(
             f"*📝 Generated Caption:*\n\n{caption}\n\n"
-            "Now let's collect a few more details for the post.\n\n"
-            "💰 What is the *asking price*? (e.g. $650,000 or 650k)",
+            f"{_HR2}\n"
+            "_Step 3 of 6 — Price_\n\n"
+            "💰 What is the *asking price*?\n"
+            "_e.g. $650,000 or 650k_",
             parse_mode=ParseMode.MARKDOWN,
             reply_markup=ForceReply(selective=True),
         )
@@ -956,7 +1001,9 @@ async def handle_price(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
     """Receive the price and ask for location."""
     context.user_data[CTX_PRICE] = update.effective_message.text or ""
     await update.effective_message.reply_text(
-        "📍 What is the *location / city*? (e.g. Ottawa, ON)",
+        "_Step 4 of 6 — Location_\n\n"
+        "📍 What is the *location / city*?\n"
+        "_e.g. Ottawa, ON_",
         parse_mode=ParseMode.MARKDOWN,
         reply_markup=ForceReply(selective=True),
     )
@@ -967,7 +1014,9 @@ async def handle_location(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     """Receive the location and ask for bedroom count."""
     context.user_data[CTX_LOCATION] = update.effective_message.text or ""
     await update.effective_message.reply_text(
-        "🛏 How many *bedrooms*? (e.g. 3)",
+        "_Step 5 of 6 — Bedrooms & Bathrooms_\n\n"
+        "🛏 How many *bedrooms*?\n"
+        "_e.g. 3_",
         parse_mode=ParseMode.MARKDOWN,
         reply_markup=ForceReply(selective=True),
     )
@@ -978,7 +1027,8 @@ async def handle_bedrooms(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     """Receive the bedroom count and ask for bathroom count."""
     context.user_data[CTX_BEDROOMS] = update.effective_message.text or ""
     await update.effective_message.reply_text(
-        "🚿 How many *bathrooms*? (e.g. 2)",
+        "🚿 How many *bathrooms*?\n"
+        "_e.g. 2_",
         parse_mode=ParseMode.MARKDOWN,
         reply_markup=ForceReply(selective=True),
     )
@@ -989,7 +1039,9 @@ async def handle_bathrooms(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     """Receive the bathroom count and ask for contact phone."""
     context.user_data[CTX_BATHROOMS] = update.effective_message.text or ""
     await update.effective_message.reply_text(
-        "📞 What is the *contact phone number*? (e.g. 613-555-1234)",
+        "_Step 6 of 6 — Contact_\n\n"
+        "📞 What is the *contact phone number*?\n"
+        "_e.g. 613-555-1234_",
         parse_mode=ParseMode.MARKDOWN,
         reply_markup=ForceReply(selective=True),
     )
@@ -1002,14 +1054,17 @@ async def handle_contact_phone(update: Update, context: ContextTypes.DEFAULT_TYP
     caption = context.user_data.get(CTX_CAPTION, "")
 
     summary = (
-        f"*📋 Listing Summary:*\n\n"
-        f"📝 *Caption:* {caption}\n"
-        f"💰 *Price:* {context.user_data.get(CTX_PRICE, '—')}\n"
+        f"*📋 Listing Summary*\n"
+        f"{_HR}\n\n"
+        f"📝 *Caption:*\n_{caption}_\n\n"
+        f"{_HR2}\n"
+        f"💰 *Price:*     {context.user_data.get(CTX_PRICE, '—')}\n"
         f"📍 *Location:* {context.user_data.get(CTX_LOCATION, '—')}\n"
-        f"🛏 *Bedrooms:* {context.user_data.get(CTX_BEDROOMS, '—')}\n"
-        f"🚿 *Bathrooms:* {context.user_data.get(CTX_BATHROOMS, '—')}\n"
-        f"📞 *Phone:* {context.user_data.get(CTX_CONTACT_PHONE, '—')}\n\n"
-        "Confirm to publish this listing to Facebook, Instagram & LinkedIn:"
+        f"🛏 *Beds:*      {context.user_data.get(CTX_BEDROOMS, '—')}\n"
+        f"🚿 *Baths:*     {context.user_data.get(CTX_BATHROOMS, '—')}\n"
+        f"📞 *Phone:*    {context.user_data.get(CTX_CONTACT_PHONE, '—')}\n\n"
+        f"{_HR}\n"
+        "Ready to publish to Facebook, Instagram & LinkedIn:"
     )
     await update.effective_message.reply_text(
         summary,
@@ -1266,9 +1321,10 @@ async def cmd_stop_bot(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         return
     _bot_paused = True
     await update.effective_message.reply_text(
-        "⏹ *Bot Paused*\n\n"
-        "All bot functions are now disabled.\n"
-        "Tap *▶️ Start Bot* below to resume.",
+        f"⏹ *Bot Paused*\n"
+        f"{_HR}\n\n"
+        "All bot functions are now disabled.\n\n"
+        "Tap *▶️ Start Bot* below to resume when you're ready.",
         parse_mode=ParseMode.MARKDOWN,
         reply_markup=start_bot_keyboard(),
     )
@@ -1281,8 +1337,10 @@ async def cmd_start_bot(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         return
     _bot_paused = False
     await update.effective_message.reply_text(
-        "✅ *Bot is Running!*\n\n"
-        "All functions are active. How can I help?",
+        f"✅ *Bot is Running*\n"
+        f"{_HR}\n\n"
+        "All functions are active.\n\n"
+        "Tap a button below to get started 👇",
         parse_mode=ParseMode.MARKDOWN,
         reply_markup=main_menu_keyboard(),
     )
@@ -1317,7 +1375,10 @@ async def handle_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYP
             _bot_paused = False
             await query.answer("▶️ Bot started!")
             await query.edit_message_text(
-                "✅ *Bot is Running!*\n\nAll functions are active. How can I help?",
+                f"✅ *Bot is Running*\n"
+                f"{_HR}\n\n"
+                "All functions are active.\n\n"
+                "Tap a button below to get started 👇",
                 parse_mode=ParseMode.MARKDOWN,
                 reply_markup=main_menu_keyboard(),
             )
@@ -1331,7 +1392,10 @@ async def handle_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYP
             _bot_paused = True
             await query.answer("⏹ Bot paused")
             await query.edit_message_text(
-                "⏹ *Bot Paused*\n\nTap *▶️ Start Bot* to resume.",
+                f"⏹ *Bot Paused*\n"
+                f"{_HR}\n\n"
+                "All bot functions are now disabled.\n\n"
+                "Tap *▶️ Start Bot* below to resume.",
                 parse_mode=ParseMode.MARKDOWN,
                 reply_markup=start_bot_keyboard(),
             )
@@ -1343,7 +1407,9 @@ async def handle_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYP
     if _bot_paused:
         await query.answer("⏹ Bot is paused")
         await query.edit_message_text(
-            "⏹ *Bot is paused.*\n\nTap the button below to resume.",
+            f"⏹ *Bot Paused*\n"
+            f"{_HR}\n\n"
+            "Tap *▶️ Start Bot* below to resume.",
             parse_mode=ParseMode.MARKDOWN,
             reply_markup=start_bot_keyboard(),
         )
@@ -1374,13 +1440,16 @@ async def _cmd_notes_info(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     Explains how to use the /notes command with examples, then re-shows the main menu.
     """
     await update.effective_message.reply_text(
-        "*📝 Adding Notes to a Lead*\n\n"
-        "Use the `/notes` command from the chat:\n\n"
+        f"📝 *Adding Notes to a Lead*\n"
+        f"{_HR}\n\n"
+        "Use the `/notes` command:\n\n"
         "`/notes <lead_number> <your note>`\n\n"
         "*Examples:*\n"
-        "• `/notes 3 Called back – viewing Saturday 2pm`\n"
-        "• `/notes 1 Pre-approved for $550k, very motivated`\n\n"
-        "The lead number matches the number shown next to the lead in `/leads`.",
+        "▸ `/notes 3 Called back — viewing Saturday 2pm`\n"
+        "▸ `/notes 1 Pre-approved for $550k, very motivated`\n\n"
+        f"{_HR2}\n"
+        "The lead number matches the # shown in the Qualified Leads or All Leads PDF.\n\n"
+        "💡 _Use /leads to download the latest qualified leads list._",
         parse_mode=ParseMode.MARKDOWN,
         reply_markup=main_menu_keyboard(),
     )
@@ -1558,8 +1627,10 @@ async def _on_startup(app: Application) -> None:
                 app.bot,
                 chat_id=chat_id,
                 text=(
-                    "🟢 *Real Estate Agent Assistant is Online!*\n\n"
-                    "Your bot is up and ready to go. Tap a button below to get started 👇"
+                    f"🟢 *Real Estate Agent Assistant is Online!*\n"
+                    f"{_HR}\n\n"
+                    "Your bot is up and ready. 🚀\n\n"
+                    "Tap a button below to get started 👇"
                 ),
                 reply_markup=main_menu_keyboard(),
             )
