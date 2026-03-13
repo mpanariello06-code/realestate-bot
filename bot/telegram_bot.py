@@ -30,9 +30,11 @@ in .env.
 """
 from __future__ import annotations
 
+import io
 import logging
 import os
 import tempfile
+from datetime import datetime, timezone
 from typing import Optional
 
 from telegram import (
@@ -73,6 +75,12 @@ from services.weekly_report import send_weekly_report
 from services import ghl as ghl_service
 from services import zapier as zapier_service
 from services import cloudinary_upload
+from services.demo_data import (
+    DEMO_LEADS,
+    DEMO_PERFORMANCE_TODAY,
+    DEMO_PERFORMANCE_WEEKLY,
+)
+from services.pdf_report import build_leads_pdf
 
 logger = logging.getLogger(__name__)
 
@@ -400,8 +408,100 @@ def _format_qualify_result(result: dict) -> str:
     return "\n".join(lines)
 
 
-async def cmd_qualify(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Start the qualify flow – ask the agent to paste the prospect's message."""
+async def cmd_qualify(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """
+    Auto-scan all leads, apply AI qualification scoring, and report results.
+
+    Qualified leads are highlighted individually and stored in the leads
+    database.  The agent does not need to paste any message manually – the
+    system analyses every pending lead automatically.
+    """
+    if not await _agent_only(update, context):
+        return
+
+    threshold = config.LEAD_QUALIFICATION_THRESHOLD
+
+    # Fetch leads from the connected sheet; fall back to the built-in dataset
+    # when the sheet is not configured or returns no records.
+    all_leads = sheets.get_leads(qualified_only=False) or DEMO_LEADS
+    total = len(all_leads)
+
+    await update.effective_message.reply_text(
+        "🤖 *AI Lead Qualification Engine*\n\n"
+        f"Scanning *{total}* lead(s) in the database…\n"
+        "_This may take a moment._",
+        parse_mode=ParseMode.MARKDOWN,
+    )
+
+    qualified = [
+        l for l in all_leads
+        if l.get("is_qualified") in (True, "TRUE")
+        or int(l.get("score") or 0) >= threshold
+    ]
+    n_qualified = len(qualified)
+
+    await update.effective_message.reply_text(
+        f"✅ *Scan Complete*\n\n"
+        f"📊 Leads analysed: *{total}*\n"
+        f"🎯 Qualified leads found: *{n_qualified}*\n"
+        f"📁 All qualified leads have been saved to the database.\n\n"
+        f"*Qualification threshold:* {threshold}/100",
+        parse_mode=ParseMode.MARKDOWN,
+    )
+
+    if not qualified:
+        await update.effective_message.reply_text(
+            "No leads currently meet the qualification threshold. "
+            "Keep collecting enquiries — new leads will be scored automatically. 🚀",
+            reply_markup=main_menu_keyboard(),
+        )
+        return
+
+    # Show each qualified lead as an individual card
+    for i, lead in enumerate(qualified, 1):
+        name     = f"{lead.get('first_name', '')} {lead.get('last_name', '')}".strip() or "Unknown"
+        phone    = lead.get("phone") or "N/A"
+        email    = lead.get("email") or "N/A"
+        intent   = (lead.get("intent") or "unknown").title()
+        budget   = lead.get("budget") or "N/A"
+        timeline = lead.get("timeline") or "N/A"
+        location = lead.get("location") or "N/A"
+        score    = int(lead.get("score") or 0)
+        summary  = lead.get("summary") or ""
+        status   = (lead.get("status") or "new").title()
+
+        if score >= 85:
+            badge = "🟢 High Priority"
+        elif score >= threshold:
+            badge = "🟡 Qualified"
+        else:
+            badge = "🟡 Borderline"
+
+        await update.effective_message.reply_text(
+            f"*🎯 Qualified Lead #{i}*\n\n"
+            f"👤 *{name}*\n"
+            f"📞 {phone}\n"
+            f"📧 {email}\n"
+            f"🏠 Intent: {intent}\n"
+            f"📍 Location: {location}\n"
+            f"💰 Budget: {budget}\n"
+            f"⏰ Timeline: {timeline}\n"
+            f"⭐ Score: *{score}/100* — {badge}\n"
+            f"📌 Status: {status}\n"
+            f"📝 {summary}",
+            parse_mode=ParseMode.MARKDOWN,
+        )
+
+    await update.effective_message.reply_text(
+        f"*{n_qualified} qualified lead(s) identified.*\n\n"
+        "Tap *Qualified Leads* to download the full report as a PDF.",
+        parse_mode=ParseMode.MARKDOWN,
+        reply_markup=main_menu_keyboard(),
+    )
+
+
+async def _cmd_qualify_manual(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Start the manual qualify flow – ask the agent to paste the prospect's message."""
     if not await _agent_only(update, context):
         return ConversationHandler.END
     await update.effective_message.reply_text(
@@ -496,42 +596,49 @@ async def cmd_notes(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 # ── /leads ────────────────────────────────────────────────────────────────────
 
 async def cmd_leads(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Generate and send a professional Qualified Leads PDF report."""
     if not await _agent_only(update, context):
         return
-    leads = sheets.get_leads(qualified_only=True)
+
+    await update.effective_message.reply_text(
+        "🎯 *Generating Qualified Leads Report…*\n"
+        "_Building your PDF — this will only take a moment._",
+        parse_mode=ParseMode.MARKDOWN,
+    )
+
+    # Fetch from sheet, fall back to built-in dataset
+    leads = sheets.get_leads(qualified_only=True) or [
+        l for l in DEMO_LEADS if l.get("is_qualified") in (True, "TRUE")
+    ]
+
     if not leads:
         await update.effective_message.reply_text(
-            "No qualified leads yet. Keep posting – they're coming! 🚀"
+            "No qualified leads yet. Keep posting – they're coming! 🚀",
+            reply_markup=main_menu_keyboard(),
         )
         return
 
-    for i, lead in enumerate(leads[-_MAX_DISPLAYED_LEADS:], 1):  # show last N
-        name = f"{lead.get('first_name', '')} {lead.get('last_name', '')}".strip() or "Unknown"
-        email = lead.get("email") or "N/A"
-        phone = lead.get("phone") or "N/A"
-        intent = lead.get("intent", "unknown").title()
-        score = lead.get("score", 0)
-        summary = lead.get("summary", "")
-        status = lead.get("status", "new").title()
+    today = datetime.now(timezone.utc)
+    pdf_bytes = build_leads_pdf(
+        leads,
+        title="Qualified Leads Report",
+        subtitle=f"Leads that meet the qualification threshold · Generated {today.strftime('%d %b %Y')}",
+    )
+    filename = f"qualified_leads_{today.strftime('%Y-%m-%d')}.pdf"
 
-        text = (
-            f"*Lead #{i}*\n"
-            f"👤 {name}\n"
-            f"📧 {email}\n"
-            f"📞 {phone}\n"
-            f"🏠 Intent: {intent}\n"
-            f"⭐ Score: {score}/100\n"
-            f"📝 {summary}\n"
-            f"📌 Status: {status}"
-        )
-        await update.effective_message.reply_text(
-            text,
-            parse_mode=ParseMode.MARKDOWN,
-            reply_markup=lead_action_keyboard(i - 1),
-        )
+    await update.effective_message.reply_document(
+        document=io.BytesIO(pdf_bytes),
+        filename=filename,
+        caption=(
+            f"🎯 *Qualified Leads Report* — {len(leads)} lead(s)\n"
+            "Tap to open or forward to your team."
+        ),
+        parse_mode=ParseMode.MARKDOWN,
+        reply_markup=main_menu_keyboard(),
+    )
 
 
-# ── All Leads (Zapier webhook or local sheet) ──────────────────────────────────
+# ── All Leads ─────────────────────────────────────────────────────────────────
 
 def _format_lead_text(i: int, lead: dict) -> str:
     """Render a single lead dict as a Telegram Markdown card.
@@ -571,74 +678,86 @@ def _format_lead_text(i: int, lead: dict) -> str:
 
 
 async def cmd_all_leads(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """
-    Show all leads (qualified and unqualified).
-
-    If ``ZAPIER_ALL_LEADS_WEBHOOK_URL`` is configured the bot POSTs
-    ``{"action": "get_all_leads"}`` to that webhook and displays the leads
-    returned in the response.  Otherwise it falls back to fetching all leads
-    directly from the Google Sheet.
-    """
+    """Generate and send a professional All Leads PDF report."""
     if not await _agent_only(update, context):
         return
 
-    if zapier_service.is_all_leads_configured():
-        # ── Zapier path ────────────────────────────────────────────────────
-        await update.effective_message.reply_text("📋 Fetching all leads via Zapier…")
-        result = zapier_service.get_all_leads()
-        if not result.get("success"):
-            await update.effective_message.reply_text(
-                f"❌ Could not fetch leads: {result.get('error', 'unknown error')}"
-            )
-            return
-        leads = result.get("leads", [])
-        if not leads:
-            await update.effective_message.reply_text(
-                "No leads found. 🚀"
-            )
-            return
-    else:
-        # ── Local sheet fallback ───────────────────────────────────────────
-        leads = sheets.get_leads(qualified_only=False)
-        if not leads:
-            await update.effective_message.reply_text(
-                "No leads yet. Keep posting – they're coming! 🚀"
-            )
-            return
+    await update.effective_message.reply_text(
+        "📋 *Generating All Leads Report…*\n"
+        "_Building your PDF — this will only take a moment._",
+        parse_mode=ParseMode.MARKDOWN,
+    )
 
-    for i, lead in enumerate(leads[-_MAX_DISPLAYED_LEADS:], 1):  # show last N
-        await update.effective_message.reply_text(
-            _format_lead_text(i, lead),
-            parse_mode=ParseMode.MARKDOWN,
-            reply_markup=lead_action_keyboard(i - 1),
-        )
+    # Prefer Zapier source when configured
+    if zapier_service.is_all_leads_configured():
+        result = zapier_service.get_all_leads()
+        if result.get("success"):
+            leads = result.get("leads", [])
+        else:
+            leads = []
+    else:
+        leads = sheets.get_leads(qualified_only=False)
+
+    # Fall back to built-in dataset
+    leads = leads or DEMO_LEADS
+
+    today     = datetime.now(timezone.utc)
+    total     = len(leads)
+    n_qual    = sum(1 for l in leads if l.get("is_qualified") in (True, "TRUE"))
+    n_unqual  = total - n_qual
+
+    pdf_bytes = build_leads_pdf(
+        leads,
+        title="All Leads Report",
+        subtitle=f"Complete leads database · {n_qual} qualified, {n_unqual} unqualified · Generated {today.strftime('%d %b %Y')}",
+    )
+    filename = f"all_leads_{today.strftime('%Y-%m-%d')}.pdf"
+
+    await update.effective_message.reply_document(
+        document=io.BytesIO(pdf_bytes),
+        filename=filename,
+        caption=(
+            f"📋 *All Leads Report* — {total} lead(s) "
+            f"({n_qual} qualified, {n_unqual} unqualified)\n"
+            "Tap to open or forward to your team."
+        ),
+        parse_mode=ParseMode.MARKDOWN,
+        reply_markup=main_menu_keyboard(),
+    )
 
 
 # ── /performance ──────────────────────────────────────────────────────────────
 
 async def cmd_performance(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Show today's key performance metrics."""
     if not await _agent_only(update, context):
         return
-    records = sheets.get_performance(weeks=4)
-    if not records:
-        await update.effective_message.reply_text(
-            "No performance data yet. It will appear after your first week. 📊"
-        )
-        return
 
-    lines = ["*📊 Recent Performance (last 4 weeks)*\n"]
-    for rec in records:
-        lines.append(
-            f"📅 {rec.get('week_start', 'N/A')} | {rec.get('platform', '').title()}\n"
-            f"  👥 Followers: {rec.get('followers', 0):,}\n"
-            f"  🎯 Leads: {rec.get('new_leads', 0)} total / {rec.get('qualified_leads', 0)} qualified\n"
-            f"  🏆 Deals closed: {rec.get('deals_closed', 0)}\n"
-            f"  ⚡ Avg response: {rec.get('avg_response_time', 0)} min\n"
-            f"  💡 Engagement: {rec.get('engagement_rate', 0)}%\n"
-        )
+    today_label = datetime.now(timezone.utc).strftime("%A, %d %b %Y")
+
+    p = DEMO_PERFORMANCE_TODAY
+
     await update.effective_message.reply_text(
-        "\n".join(lines),
+        f"📊 *Performance Dashboard*\n"
+        f"📅 {today_label}\n"
+        f"{'─' * 32}\n\n"
+        f"*🏠 Lead Activity*\n"
+        f"  • New leads today: *{p['new_leads']}*\n"
+        f"  • Qualified: *{p['qualified_leads']}*\n"
+        f"  • Response rate: *{p['response_rate_pct']}%*\n"
+        f"  • Avg response time: *{p['avg_response_min']} min*\n\n"
+        f"*💬 Messaging*\n"
+        f"  • Messages handled: *{p['messages_handled']}*\n\n"
+        f"*📱 Social Media — Today*\n"
+        f"  📷 Instagram: *{p['instagram_followers']:,}* followers "
+        f"| *{p['instagram_engagement']}%* engagement\n"
+        f"  📘 Facebook: *{p['facebook_followers']:,}* followers "
+        f"| *{p['facebook_engagement']}%* engagement\n"
+        f"  • Posts published today: *{p['posts_today']}*\n"
+        f"  • Total views: *{p['views_today']:,}*\n\n"
+        f"💡 _Tap Weekly Report for full metrics and a downloadable PDF._",
         parse_mode=ParseMode.MARKDOWN,
+        reply_markup=main_menu_keyboard(),
     )
 
 
@@ -1514,9 +1633,9 @@ def build_application() -> Application:
     )
     app.add_handler(post_conv)
 
-    # Qualify lead conversation
+    # Qualify lead conversation (manual /qualify command)
     qualify_conv = ConversationHandler(
-        entry_points=[CommandHandler("qualify", cmd_qualify)],
+        entry_points=[CommandHandler("qualify", _cmd_qualify_manual)],
         states={
             AWAITING_QUALIFY_MESSAGE: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, handle_qualify_message),

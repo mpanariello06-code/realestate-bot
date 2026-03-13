@@ -1,7 +1,9 @@
 """
 PDF Report Generator
-Builds a formatted PDF weekly performance report for real estate agents
-using ReportLab, and returns it as raw bytes for Telegram delivery.
+Builds formatted PDF reports for real estate agents using ReportLab:
+
+* build_report_pdf  – weekly performance report
+* build_leads_pdf   – qualified or all-leads contact sheet
 """
 from __future__ import annotations
 
@@ -308,6 +310,159 @@ def build_report_pdf(leads: list[dict], perf_records: list[dict]) -> bytes:
     story.append(HRFlowable(width="100%", thickness=1, color=_GREY_MID, spaceAfter=4))
     story.append(Paragraph(
         f"Generated on {today.strftime('%d %b %Y at %H:%M UTC')} · Real Estate Agent Bot",
+        st["Footer"],
+    ))
+
+    doc.build(story)
+    return buf.getvalue()
+
+
+# ── Leads PDF ─────────────────────────────────────────────────────────────────
+
+def _score_colour(score: int) -> colors.Color:
+    """Return a colour reflecting lead quality."""
+    if score >= 80:
+        return _GREEN
+    if score >= 60:
+        return _AMBER
+    return _RED
+
+
+def build_leads_pdf(leads: list[dict], title: str, subtitle: str) -> bytes:
+    """
+    Build a professional leads contact-sheet PDF.
+
+    Parameters
+    ----------
+    leads    : list of lead dicts (same shape as sheets.get_leads())
+    title    : document heading (e.g. "Qualified Leads Report")
+    subtitle : one-line description shown under the title
+
+    Returns
+    -------
+    bytes – raw PDF content ready to be sent as a Telegram document.
+    """
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buf,
+        pagesize=A4,
+        leftMargin=1.8 * cm,
+        rightMargin=1.8 * cm,
+        topMargin=2 * cm,
+        bottomMargin=2 * cm,
+        title=title,
+        author="Real Estate Agent Bot",
+    )
+
+    st  = _styles()
+    now = datetime.now(timezone.utc)
+
+    # ── Summary stats ─────────────────────────────────────────────────────────
+    total      = len(leads)
+    n_qual     = sum(1 for l in leads if l.get("is_qualified") in (True, "TRUE"))
+    n_new      = sum(1 for l in leads if l.get("status", "new") == "new")
+    n_cont     = sum(1 for l in leads if l.get("status") == "contacted")
+    n_closed   = sum(1 for l in leads if l.get("status") == "closed")
+
+    story: list = []
+
+    # Header
+    story.append(Paragraph(f"🏠 {title}", st["ReportTitle"]))
+    story.append(Paragraph(subtitle, st["SubTitle"]))
+    story.append(HRFlowable(width="100%", thickness=2, color=_BRAND_MID, spaceAfter=10))
+
+    # Summary bar
+    summary_rows = [
+        ["Total Leads", "Qualified", "New", "Contacted", "Closed"],
+        [str(total), str(n_qual), str(n_new), str(n_cont), str(n_closed)],
+    ]
+    col_w = [3.4 * cm] * 5
+    summary_tbl = Table(summary_rows, colWidths=col_w)
+    summary_tbl.setStyle(TableStyle([
+        ("BACKGROUND",    (0, 0), (-1, 0), _BRAND_DARK),
+        ("TEXTCOLOR",     (0, 0), (-1, 0), colors.white),
+        ("FONTNAME",      (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("BACKGROUND",    (0, 1), (-1, 1), _BRAND_LIGHT),
+        ("FONTNAME",      (0, 1), (-1, 1), "Helvetica-Bold"),
+        ("TEXTCOLOR",     (0, 1), (-1, 1), _BRAND_DARK),
+        ("FONTSIZE",      (0, 0), (-1, -1), 10),
+        ("ALIGN",         (0, 0), (-1, -1), "CENTER"),
+        ("GRID",          (0, 0), (-1, -1), 0.4, _GREY_MID),
+        ("TOPPADDING",    (0, 0), (-1, -1), 6),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+    ]))
+    story.append(summary_tbl)
+    story.append(Spacer(1, 0.5 * cm))
+
+    # ── Leads table ───────────────────────────────────────────────────────────
+    story.append(Paragraph("Lead Details", st["SectionHeader"]))
+
+    headers = ["#", "Name", "Contact", "Intent", "Budget / Timeline", "Score", "Status"]
+    rows    = [headers]
+
+    for idx, lead in enumerate(leads, 1):
+        name    = f"{lead.get('first_name', '')} {lead.get('last_name', '')}".strip() or "—"
+        phone   = lead.get("phone") or ""
+        email   = lead.get("email") or ""
+        contact = "\n".join(filter(None, [phone, email])) or "—"
+        intent  = (lead.get("intent") or "unknown").title()
+        budget  = lead.get("budget") or "—"
+        tline   = lead.get("timeline") or "—"
+        bud_tl  = f"{budget}\n{tline}" if budget != "—" or tline != "—" else "—"
+        score   = int(lead.get("score") or 0)
+        status  = (lead.get("status") or "new").title()
+
+        rows.append([
+            str(idx),
+            Paragraph(name, st["BodyText"]),
+            Paragraph(contact.replace("\n", "<br/>"), st["BodyText"]),
+            intent,
+            Paragraph(bud_tl.replace("\n", "<br/>"), st["BodyText"]),
+            Paragraph(
+                f'<font color="{_score_colour(score).hexval()}">'
+                f"<b>{score}/100</b></font>",
+                st["BodyText"],
+            ),
+            status,
+        ])
+
+    col_widths = [1 * cm, 3.5 * cm, 4 * cm, 2 * cm, 4 * cm, 2 * cm, 2.5 * cm]
+    leads_tbl = Table(rows, colWidths=col_widths, repeatRows=1)
+    leads_tbl.setStyle(TableStyle([
+        ("BACKGROUND",    (0, 0), (-1, 0), _BRAND_DARK),
+        ("TEXTCOLOR",     (0, 0), (-1, 0), colors.white),
+        ("FONTNAME",      (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("FONTSIZE",      (0, 0), (-1, -1), 9),
+        ("ROWBACKGROUNDS",(0, 1), (-1, -1), [_GREY_LIGHT, colors.white]),
+        ("GRID",          (0, 0), (-1, -1), 0.4, _GREY_MID),
+        ("ALIGN",         (0, 0), (0, -1), "CENTER"),   # #
+        ("ALIGN",         (3, 0), (3, -1), "CENTER"),   # Intent
+        ("ALIGN",         (5, 0), (5, -1), "CENTER"),   # Score
+        ("ALIGN",         (6, 0), (6, -1), "CENTER"),   # Status
+        ("VALIGN",        (0, 0), (-1, -1), "MIDDLE"),
+        ("LEFTPADDING",   (0, 0), (-1, -1), 5),
+        ("RIGHTPADDING",  (0, 0), (-1, -1), 5),
+        ("TOPPADDING",    (0, 0), (-1, -1), 4),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+    ]))
+    story.append(leads_tbl)
+    story.append(Spacer(1, 0.8 * cm))
+
+    # ── Agent notes section (only if any lead has notes) ─────────────────────
+    noted = [(i + 1, l) for i, l in enumerate(leads) if l.get("agent_notes")]
+    if noted:
+        story.append(Paragraph("Agent Notes", st["SectionHeader"]))
+        story.append(HRFlowable(width="100%", thickness=1, color=_BRAND_LIGHT, spaceAfter=4))
+        for num, lead in noted:
+            name  = f"{lead.get('first_name', '')} {lead.get('last_name', '')}".strip()
+            note  = lead.get("agent_notes", "")
+            story.append(Paragraph(f"<b>#{num} {name}:</b> {note}", st["BodyText"]))
+        story.append(Spacer(1, 0.5 * cm))
+
+    # ── Footer ────────────────────────────────────────────────────────────────
+    story.append(HRFlowable(width="100%", thickness=1, color=_GREY_MID, spaceAfter=4))
+    story.append(Paragraph(
+        f"Generated on {now.strftime('%d %b %Y at %H:%M UTC')} · Real Estate Agent Bot",
         st["Footer"],
     ))
 

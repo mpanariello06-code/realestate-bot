@@ -84,6 +84,7 @@ class TestMenuCallbackToasts(unittest.IsolatedAsyncioTestCase):
         context.user_data = {}
         with patch("bot.telegram_bot.cmd_performance"), \
              patch("bot.telegram_bot.cmd_leads"), \
+             patch("bot.telegram_bot.cmd_all_leads"), \
              patch("bot.telegram_bot.cmd_report"), \
              patch("bot.telegram_bot.cmd_ghl"), \
              patch("bot.telegram_bot.cmd_help"), \
@@ -155,6 +156,7 @@ class TestMenuCallbackRouting(unittest.IsolatedAsyncioTestCase):
         handlers = {
             "cmd_performance": AsyncMock(),
             "cmd_leads": AsyncMock(),
+            "cmd_all_leads": AsyncMock(),
             "cmd_report": AsyncMock(),
             "cmd_ghl": AsyncMock(),
             "cmd_help": AsyncMock(),
@@ -163,6 +165,7 @@ class TestMenuCallbackRouting(unittest.IsolatedAsyncioTestCase):
         }
         with patch("bot.telegram_bot.cmd_performance", handlers["cmd_performance"]), \
              patch("bot.telegram_bot.cmd_leads", handlers["cmd_leads"]), \
+             patch("bot.telegram_bot.cmd_all_leads", handlers["cmd_all_leads"]), \
              patch("bot.telegram_bot.cmd_report", handlers["cmd_report"]), \
              patch("bot.telegram_bot.cmd_ghl", handlers["cmd_ghl"]), \
              patch("bot.telegram_bot.cmd_help", handlers["cmd_help"]), \

@@ -80,15 +80,34 @@ class TestAgentOnlyRejectionMessage(unittest.IsolatedAsyncioTestCase):
 
 class TestCmdQualify(unittest.IsolatedAsyncioTestCase):
 
-    async def test_qualify_command_prompts_for_message(self):
-        from bot.telegram_bot import cmd_qualify, AWAITING_QUALIFY_MESSAGE
+    @patch("bot.telegram_bot.sheets.get_leads", return_value=[])
+    async def test_qualify_auto_scans_leads(self, _mock_leads):
+        """cmd_qualify auto-scans all leads and reports qualified ones."""
+        from bot.telegram_bot import cmd_qualify
         update = _make_update(chat_id=123)
         context = MagicMock()
 
         result = await cmd_qualify(update, context)
 
-        update.effective_message.reply_text.assert_awaited_once()
-        self.assertEqual(result, AWAITING_QUALIFY_MESSAGE)
+        # Auto-scan sends multiple reply_text messages; returns None (not a conv state)
+        self.assertIsNone(result)
+        self.assertGreater(update.effective_message.reply_text.await_count, 1)
+
+    @patch("bot.telegram_bot.sheets.get_leads", return_value=[])
+    async def test_qualify_scan_message_mentions_threshold(self, _mock_leads):
+        """Scan summary message must mention the qualification threshold."""
+        from bot.telegram_bot import cmd_qualify
+        update = _make_update(chat_id=123)
+        context = MagicMock()
+
+        await cmd_qualify(update, context)
+
+        # Collect all reply_text call texts
+        texts = " ".join(
+            c[0][0] if c[0] else ""
+            for c in update.effective_message.reply_text.call_args_list
+        )
+        self.assertIn("/100", texts)
 
     @patch("bot.telegram_bot.lead_qualifier.qualify_lead")
     async def test_qualify_message_shows_score_and_questions(self, mock_qualify):
